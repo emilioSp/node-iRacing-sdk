@@ -2,30 +2,37 @@
  * Main IRSDK class for communicating with iRacing
  */
 
-import * as fs from 'fs';
 import { EventEmitter } from 'events';
+import * as fs from 'fs';
 import {
-  VERSION,
-  MEMMAPFILE,
-  MEMMAPFILESIZE,
-  DATAVALIDEVENTNAME,
   BROADCASTMSGNAME,
-  VAR_TYPE_MAP,
-  StatusField,
   BroadcastMsg,
-  ChatCommandMode,
-  PitCommandMode,
   CameraState,
+  ChatCommandMode,
+  DATAVALIDEVENTNAME,
+  FFBCommandMode,
+  PitCommandMode,
+  ReloadTexturesMode,
   RpyPosMode,
   RpySrchMode,
   RpyStateMode,
-  ReloadTexturesMode,
+  StatusField,
   TelemCommandMode,
-  FFBCommandMode,
+  VAR_TYPE_MAP,
   VideoCaptureMode,
 } from './constants.js';
-import { Header, VarBuffer, VarHeader, VarBuffer as VarBufferClass } from './structs.js';
-import { checkSimStatus, extractYamlSection, parseIRSDKYaml, translateYamlData, padCarNumber } from './utils.js';
+import {
+  Header,
+  type VarBuffer as VarBufferClass,
+  VarHeader,
+} from './structs.js';
+import {
+  checkSimStatus,
+  extractYamlSection,
+  padCarNumber,
+  parseIRSDKYaml,
+  translateYamlData,
+} from './utils.js';
 
 interface SessionInfoCache {
   data: any | null;
@@ -74,16 +81,16 @@ export class IRSDK extends EventEmitter {
     try {
       // Dynamically import FFI for Windows APIs
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      // @ts-ignore - ffi-napi is an optional dependency
+      // @ts-expect-error - ffi-napi is an optional dependency
       const ffiModule = await (import('ffi-napi') as Promise<any>);
       const ffi = ffiModule.default || ffiModule;
 
       // Dynamically import ref for type definitions (may be needed by ffi-napi)
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        // @ts-ignore - ref-napi is an optional dependency
+        // @ts-expect-error - ref-napi is an optional dependency
         await (import('ref-napi') as Promise<any>);
-      } catch (e) {
+      } catch {
         // ref-napi is optional, ffi-napi might bundle it
       }
 
@@ -101,12 +108,14 @@ export class IRSDK extends EventEmitter {
           CloseHandle: ['bool', ['pointer']],
         });
         Object.assign(this.windowsApi, kernel32);
-      } catch (e) {
+      } catch {
         // Kernel32 functions may not be critical
       }
-    } catch (error) {
+    } catch {
       // FFI not available - broadcast messages won't work but regular telemetry will
-      console.debug('Windows API libraries not available. Broadcast messages will not work.');
+      console.debug(
+        'Windows API libraries not available. Broadcast messages will not work.',
+      );
     }
   }
 
@@ -124,7 +133,11 @@ export class IRSDK extends EventEmitter {
 
         // Try to open data valid event (Windows only)
         if (this.windowsApi) {
-          this.dataValidEvent = this.windowsApi.OpenEventW(0x00100000, false, DATAVALIDEVENTNAME);
+          this.dataValidEvent = this.windowsApi.OpenEventW(
+            0x00100000,
+            false,
+            DATAVALIDEVENTNAME,
+          );
         }
       }
 
@@ -143,7 +156,9 @@ export class IRSDK extends EventEmitter {
         } else if (process.platform === 'win32') {
           // For production, would need to use Windows APIs to open named shared memory
           // For now, this is a placeholder
-          console.warn('Shared memory access on Windows requires additional setup');
+          console.warn(
+            'Shared memory access on Windows requires additional setup',
+          );
           return false;
         } else {
           console.error('iRacing SDK only works on Windows');
@@ -159,7 +174,8 @@ export class IRSDK extends EventEmitter {
 
         // Initialize header
         this.header = new Header(this.sharedMem);
-        this.isInitialized = this.header.version >= 1 && this.header.varBuf.length > 0;
+        this.isInitialized =
+          this.header.version >= 1 && this.header.varBuf.length > 0;
       }
 
       return this.isInitialized;
@@ -220,7 +236,13 @@ export class IRSDK extends EventEmitter {
       } else {
         const result: any[] = [];
         for (let i = 0; i < varHeader.count; i++) {
-          result.push(this.unpackValue(memory, offset + i * this.getTypeSize(typeChar), typeChar));
+          result.push(
+            this.unpackValue(
+              memory,
+              offset + i * this.getTypeSize(typeChar),
+              typeChar,
+            ),
+          );
         }
         return result;
       }
@@ -242,22 +264,32 @@ export class IRSDK extends EventEmitter {
       this.workaroundConnectedState = 0;
     }
 
-    if (this.workaroundConnectedState === 0 && this.header.status !== StatusField.status_connected) {
+    if (
+      this.workaroundConnectedState === 0 &&
+      this.header.status !== StatusField.status_connected
+    ) {
       this.workaroundConnectedState = 1;
     }
 
-    if (this.workaroundConnectedState === 1 && (this.get('SessionNum') === null || this.testFile)) {
+    if (
+      this.workaroundConnectedState === 1 &&
+      (this.get('SessionNum') === null || this.testFile)
+    ) {
       this.workaroundConnectedState = 2;
     }
 
-    if (this.workaroundConnectedState === 2 && this.get('SessionNum') !== null) {
+    if (
+      this.workaroundConnectedState === 2 &&
+      this.get('SessionNum') !== null
+    ) {
       this.workaroundConnectedState = 3;
     }
 
     return (
       this.header !== null &&
       (this.testFile !== null || this.dataValidEvent) &&
-      (this.header.status === StatusField.status_connected || this.workaroundConnectedState === 3)
+      (this.header.status === StatusField.status_connected ||
+        this.workaroundConnectedState === 3)
     );
   }
 
@@ -286,7 +318,9 @@ export class IRSDK extends EventEmitter {
     this.waitValidDataEventSync();
 
     if (this.header) {
-      const sorted = [...this.header.varBuf].sort((a, b) => b.tickCount - a.tickCount);
+      const sorted = [...this.header.varBuf].sort(
+        (a, b) => b.tickCount - a.tickCount,
+      );
       this.varBufferLatest = sorted[0];
       this.varBufferLatest.freeze();
     }
@@ -304,12 +338,30 @@ export class IRSDK extends EventEmitter {
 
   // Broadcast message methods
 
-  camSwitchPos(position: number = 0, group: number = 1, camera: number = 0): boolean {
-    return this.broadcastMsg(BroadcastMsg.cam_switch_pos, position, group, camera);
+  camSwitchPos(
+    position: number = 0,
+    group: number = 1,
+    camera: number = 0,
+  ): boolean {
+    return this.broadcastMsg(
+      BroadcastMsg.cam_switch_pos,
+      position,
+      group,
+      camera,
+    );
   }
 
-  camSwitchNum(carNumber: string | number = '1', group: number = 1, camera: number = 0): boolean {
-    return this.broadcastMsg(BroadcastMsg.cam_switch_num, padCarNumber(carNumber), group, camera);
+  camSwitchNum(
+    carNumber: string | number = '1',
+    group: number = 1,
+    camera: number = 0,
+  ): boolean {
+    return this.broadcastMsg(
+      BroadcastMsg.cam_switch_num,
+      padCarNumber(carNumber),
+      group,
+      camera,
+    );
   }
 
   camSetState(cameraState: number = CameraState.cam_tool_active): boolean {
@@ -317,11 +369,22 @@ export class IRSDK extends EventEmitter {
   }
 
   replaySetPlaySpeed(speed: number = 0, slowMotion: boolean = false): boolean {
-    return this.broadcastMsg(BroadcastMsg.replay_set_play_speed, speed, slowMotion ? 1 : 0);
+    return this.broadcastMsg(
+      BroadcastMsg.replay_set_play_speed,
+      speed,
+      slowMotion ? 1 : 0,
+    );
   }
 
-  replaySetPlayPosition(posMode: number = RpyPosMode.begin, frameNum: number = 0): boolean {
-    return this.broadcastMsg(BroadcastMsg.replay_set_play_position, posMode, frameNum);
+  replaySetPlayPosition(
+    posMode: number = RpyPosMode.begin,
+    frameNum: number = 0,
+  ): boolean {
+    return this.broadcastMsg(
+      BroadcastMsg.replay_set_play_position,
+      posMode,
+      frameNum,
+    );
   }
 
   replaySearch(searchMode: number = RpySrchMode.to_start): boolean {
@@ -333,11 +396,18 @@ export class IRSDK extends EventEmitter {
   }
 
   reloadAllTextures(): boolean {
-    return this.broadcastMsg(BroadcastMsg.reload_textures, ReloadTexturesMode.all);
+    return this.broadcastMsg(
+      BroadcastMsg.reload_textures,
+      ReloadTexturesMode.all,
+    );
   }
 
   reloadTexture(carIdx: number = 0): boolean {
-    return this.broadcastMsg(BroadcastMsg.reload_textures, ReloadTexturesMode.car_idx, carIdx);
+    return this.broadcastMsg(
+      BroadcastMsg.reload_textures,
+      ReloadTexturesMode.car_idx,
+      carIdx,
+    );
   }
 
   chatCommand(chatCommandMode: number = ChatCommandMode.begin_chat): boolean {
@@ -345,26 +415,53 @@ export class IRSDK extends EventEmitter {
   }
 
   chatCommandMacro(macroNum: number = 0): boolean {
-    return this.broadcastMsg(BroadcastMsg.chat_command, ChatCommandMode.macro, macroNum);
+    return this.broadcastMsg(
+      BroadcastMsg.chat_command,
+      ChatCommandMode.macro,
+      macroNum,
+    );
   }
 
-  pitCommand(pitCommandMode: number = PitCommandMode.clear, variable: number = 0): boolean {
-    return this.broadcastMsg(BroadcastMsg.pit_command, pitCommandMode, variable);
+  pitCommand(
+    pitCommandMode: number = PitCommandMode.clear,
+    variable: number = 0,
+  ): boolean {
+    return this.broadcastMsg(
+      BroadcastMsg.pit_command,
+      pitCommandMode,
+      variable,
+    );
   }
 
   telemCommand(telemCommandMode: number = TelemCommandMode.stop): boolean {
     return this.broadcastMsg(BroadcastMsg.telem_command, telemCommandMode);
   }
 
-  ffbCommand(ffbCommandMode: number = FFBCommandMode.ffb_command_max_force, value: number = 0): boolean {
-    return this.broadcastMsg(BroadcastMsg.ffb_command, ffbCommandMode, Math.floor(value * 65536));
+  ffbCommand(
+    ffbCommandMode: number = FFBCommandMode.ffb_command_max_force,
+    value: number = 0,
+  ): boolean {
+    return this.broadcastMsg(
+      BroadcastMsg.ffb_command,
+      ffbCommandMode,
+      Math.floor(value * 65536),
+    );
   }
 
-  replaySearchSessionTime(sessionNum: number = 0, sessionTimeMs: number = 0): boolean {
-    return this.broadcastMsg(BroadcastMsg.replay_search_session_time, sessionNum, sessionTimeMs);
+  replaySearchSessionTime(
+    sessionNum: number = 0,
+    sessionTimeMs: number = 0,
+  ): boolean {
+    return this.broadcastMsg(
+      BroadcastMsg.replay_search_session_time,
+      sessionNum,
+      sessionTimeMs,
+    );
   }
 
-  videoCapture(videoCaptureMode: number = VideoCaptureMode.trigger_screen_shot): boolean {
+  videoCapture(
+    videoCaptureMode: number = VideoCaptureMode.trigger_screen_shot,
+  ): boolean {
     return this.broadcastMsg(BroadcastMsg.video_capture, videoCaptureMode);
   }
 
@@ -376,7 +473,10 @@ export class IRSDK extends EventEmitter {
       this.varHeadersDict.clear();
 
       for (let i = 0; i < this.header.numVars; i++) {
-        const varHeader = new VarHeader(this.sharedMem, this.header.varHeaderOffset + i * 144);
+        const varHeader = new VarHeader(
+          this.sharedMem,
+          this.header.varHeaderOffset + i * 144,
+        );
         this.varHeaders.push(varHeader);
         this.varHeadersDict.set(varHeader.name, varHeader);
       }
@@ -395,7 +495,9 @@ export class IRSDK extends EventEmitter {
     }
 
     // Return 2nd most recent var buffer (to avoid partially updated buffers)
-    const sorted = [...this.header.varBuf].sort((a, b) => b.tickCount - a.tickCount);
+    const sorted = [...this.header.varBuf].sort(
+      (a, b) => b.tickCount - a.tickCount,
+    );
     return sorted.length > 1 ? sorted[1] : sorted[0];
   }
 
@@ -422,7 +524,10 @@ export class IRSDK extends EventEmitter {
     }
 
     if (this.parseYamlAsync) {
-      if (!cache.asyncSessionInfoUpdate || cache.asyncSessionInfoUpdate < this.lastSessionInfoUpdate) {
+      if (
+        !cache.asyncSessionInfoUpdate ||
+        cache.asyncSessionInfoUpdate < this.lastSessionInfoUpdate
+      ) {
         cache.asyncSessionInfoUpdate = this.lastSessionInfoUpdate;
         this.parseYamlAsync && this.parseYamlContent(key, cache);
       }
@@ -445,7 +550,11 @@ export class IRSDK extends EventEmitter {
     }
 
     // Check if binary data is the same as last time
-    if (cache.dataBinary && dataBinary.equals(cache.dataBinary) && cache.dataLast) {
+    if (
+      cache.dataBinary &&
+      dataBinary.equals(cache.dataBinary) &&
+      cache.dataLast
+    ) {
       cache.data = cache.dataLast;
       return;
     }
@@ -456,7 +565,10 @@ export class IRSDK extends EventEmitter {
     const yamlStr = translateYamlData(dataBinary);
     const parsed = parseIRSDKYaml(yamlStr);
 
-    if (parsed && (!this.parseYamlAsync || this.lastSessionInfoUpdate === sessionInfoUpdate)) {
+    if (
+      parsed &&
+      (!this.parseYamlAsync || this.lastSessionInfoUpdate === sessionInfoUpdate)
+    ) {
       const result = parsed[key];
       if (result) {
         cache.data = result;
@@ -472,12 +584,20 @@ export class IRSDK extends EventEmitter {
       return null;
     }
 
-    return extractYamlSection(this.sharedMem, this.header.sessionInfoOffset, this.header.sessionInfoLen, key);
+    return extractYamlSection(
+      this.sharedMem,
+      this.header.sessionInfoOffset,
+      this.header.sessionInfoLen,
+      key,
+    );
   }
 
   private async waitValidDataEvent(): Promise<boolean> {
     if (this.dataValidEvent && this.windowsApi) {
-      const result = this.windowsApi.WaitForSingleObject(this.dataValidEvent, 32);
+      const result = this.windowsApi.WaitForSingleObject(
+        this.dataValidEvent,
+        32,
+      );
       return result === 0;
     }
     return true;
@@ -489,7 +609,12 @@ export class IRSDK extends EventEmitter {
     return true;
   }
 
-  private broadcastMsg(broadcastType: number, var1: number = 0, var2: number = 0, var3: number = 0): boolean {
+  private broadcastMsg(
+    broadcastType: number,
+    var1: number = 0,
+    var2: number = 0,
+    var3: number = 0,
+  ): boolean {
     if (!this.windowsApi) {
       console.warn('Windows API not available. Broadcast message not sent.');
       return false;
@@ -505,7 +630,7 @@ export class IRSDK extends EventEmitter {
         0xffff,
         msgId,
         (broadcastType | (var1 << 16)) >>> 0,
-        (var2 | (var3 << 16)) >>> 0
+        (var2 | (var3 << 16)) >>> 0,
       );
     } catch (error) {
       console.error('Failed to send broadcast message:', error);
@@ -516,7 +641,8 @@ export class IRSDK extends EventEmitter {
   private getBroadcastMsgId(): number | null {
     if (this.broadcastMsgId === null && this.windowsApi) {
       try {
-        this.broadcastMsgId = this.windowsApi.RegisterWindowMessageW(BROADCASTMSGNAME);
+        this.broadcastMsgId =
+          this.windowsApi.RegisterWindowMessageW(BROADCASTMSGNAME);
       } catch (error) {
         console.error('Failed to register broadcast message:', error);
         return null;

@@ -4,7 +4,8 @@
 
 export const VERSION = '1.3.5';
 
-export const SIM_STATUS_URL = 'http://127.0.0.1:32034/get_sim_status?object=simStatus';
+export const SIM_STATUS_URL =
+  'http://127.0.0.1:32034/get_sim_status?object=simStatus';
 
 export const DATAVALIDEVENTNAME = 'Local\\IRSDKDataValidEvent';
 export const MEMMAPFILE = 'Local\\IRSDKMemMapFileName';
@@ -14,14 +15,12 @@ export const BROADCASTMSGNAME = 'IRSDK_BROADCASTMSG';
 export const VAR_TYPE_MAP = ['c', '?', 'i', 'I', 'f', 'd'];
 
 export const YAML_TRANSLATER: { [key: number]: number } = {
-  0x81: 0x20,
-  0x8d: 0x20,
-  0x8f: 0x20,
-  0x90: 0x20,
-  0x9d: 0x20,
+  129: 0x20,
+  141: 0x20,
+  143: 0x20,
+  144: 0x20,
+  157: 0x20,
 };
-
-export const YAML_CODE_PAGE = 'cp1252';
 
 // Status Fields
 export class StatusField {
@@ -308,4 +307,3 @@ export class TrackWetness {
   static readonly very_wet = 6;
   static readonly extremely_wet = 7;
 }
-

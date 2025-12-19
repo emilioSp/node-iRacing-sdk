@@ -53,7 +53,9 @@ try {
     console.log(`Total records: ${allSpeeds.length}`);
     console.log(`Min speed: ${Math.min(...allSpeeds).toFixed(2)}`);
     console.log(`Max speed: ${Math.max(...allSpeeds).toFixed(2)}`);
-    console.log(`Avg speed: ${(allSpeeds.reduce((a, b) => a + b, 0) / allSpeeds.length).toFixed(2)}`);
+    console.log(
+      `Avg speed: ${(allSpeeds.reduce((a, b) => a + b, 0) / allSpeeds.length).toFixed(2)}`,
+    );
   }
 
   // Get specific record at index
@@ -74,7 +76,11 @@ try {
       console.log(`  Record ${i}: ${(allThrottles[i] * 100).toFixed(2)}%`);
     }
     console.log('Last 5 throttle values:');
-    for (let i = Math.max(0, allThrottles.length - 5); i < allThrottles.length; i++) {
+    for (
+      let i = Math.max(0, allThrottles.length - 5);
+      i < allThrottles.length;
+      i++
+    ) {
       console.log(`  Record ${i}: ${(allThrottles[i] * 100).toFixed(2)}%`);
     }
   }
@@ -98,4 +104,3 @@ try {
   ibt.close();
   console.log('IBT file closed.');
 }
-

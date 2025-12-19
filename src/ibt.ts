@@ -3,8 +3,8 @@
  */
 
 import * as fs from 'fs';
-import { Header, VarHeader, DiskSubHeader } from './structs.js';
 import { VAR_TYPE_MAP } from './constants.js';
+import { DiskSubHeader, Header, VarHeader } from './structs.js';
 
 export class IBT {
   private ibtFile: fs.ReadStream | null = null;
@@ -21,7 +21,9 @@ export class IBT {
   }
 
   get varHeaderBufferTick(): number | null {
-    return this.header && this.header.varBuf[0] ? this.header.varBuf[0].tickCount : null;
+    return this.header && this.header.varBuf[0]
+      ? this.header.varBuf[0].tickCount
+      : null;
   }
 
   get varHeadersNamesList(): string[] | null {
@@ -86,7 +88,10 @@ export class IBT {
     }
 
     const typeChar = VAR_TYPE_MAP[varHeader.type];
-    const varOffset = varHeader.offset + this.header.varBuf[0]._bufOffset + index * this.header.bufLen;
+    const varOffset =
+      varHeader.offset +
+      this.header.varBuf[0]._bufOffset +
+      index * this.header.bufLen;
 
     return this.unpackValues(varOffset, typeChar, varHeader.count);
   }
@@ -120,7 +125,11 @@ export class IBT {
     const varOffset = varHeader.offset + this.header.varBuf[0]._bufOffset;
 
     for (let i = 0; i < this.diskHeader.sessionRecordCount; i++) {
-      const value = this.unpackValues(varOffset + i * bufLen, typeChar, varHeader.count);
+      const value = this.unpackValues(
+        varOffset + i * bufLen,
+        typeChar,
+        varHeader.count,
+      );
       results.push(value);
     }
 
@@ -135,7 +144,10 @@ export class IBT {
       this.varHeadersDict.clear();
 
       for (let i = 0; i < this.header.numVars; i++) {
-        const varHeader = new VarHeader(this.sharedMem, this.header.varHeaderOffset + i * 144);
+        const varHeader = new VarHeader(
+          this.sharedMem,
+          this.header.varHeaderOffset + i * 144,
+        );
         this.varHeaders.push(varHeader);
         this.varHeadersDict.set(varHeader.name, varHeader);
       }
@@ -202,4 +214,3 @@ export class IBT {
 }
 
 export default IBT;
-

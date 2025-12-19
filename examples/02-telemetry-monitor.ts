@@ -47,20 +47,40 @@ async function main() {
     console.log('╔═══════════════════════════════════════════════════╗');
     console.log('║           IRACING TELEMETRY MONITOR              ║');
     console.log('╠═══════════════════════════════════════════════════╣');
-    console.log(`║ Speed:        ${String((speed * 3.6).toFixed(1) + ' km/h').padEnd(32)} ║`);
+    console.log(
+      `║ Speed:        ${String(`${(speed * 3.6).toFixed(1)} + ' km/h')`.padEnd(32)} ║`,
+    );
     console.log(`║ RPM:          ${String(rpm.toFixed(0)).padEnd(32)} ║`);
-    console.log(`║ Gear:         ${String(gear === 0 ? 'R' : gear === -1 ? 'N' : gear).padEnd(32)} ║`);
+    console.log(
+      `║ Gear:         ${String(gear === 0 ? 'R' : gear === -1 ? 'N' : gear).padEnd(32)} ║`,
+    );
     console.log('╠═══════════════════════════════════════════════════╣');
-    console.log(`║ Throttle:     ${String((throttle * 100).toFixed(1) + '%').padEnd(32)} ║`);
-    console.log(`║ Brake:        ${String((brake * 100).toFixed(1) + '%').padEnd(32)} ║`);
-    console.log(`║ Clutch:       ${String((clutch * 100).toFixed(1) + '%').padEnd(32)} ║`);
+    console.log(
+      `║ Throttle:     ${String((throttle * 100).toFixed(1) + '%').padEnd(32)} ║`,
+    );
+    console.log(
+      `║ Brake:        ${String((brake * 100).toFixed(1) + '%').padEnd(32)} ║`,
+    );
+    console.log(
+      `║ Clutch:       ${String((clutch * 100).toFixed(1) + '%').padEnd(32)} ║`,
+    );
     console.log('╠═══════════════════════════════════════════════════╣');
-    console.log(`║ Fuel:         ${String(fuel.toFixed(2) + ' L').padEnd(32)} ║`);
-    console.log(`║ Fuel/Lap:     ${String((fuelPerLap / 3600).toFixed(2) + ' L/h').padEnd(32)} ║`);
-    console.log(`║ Water Temp:   ${String(waterTemp.toFixed(1) + ' °C').padEnd(32)} ║`);
-    console.log(`║ Oil Temp:     ${String(oilTemp.toFixed(1) + ' °C').padEnd(32)} ║`);
+    console.log(
+      `║ Fuel:         ${String(fuel.toFixed(2) + ' L').padEnd(32)} ║`,
+    );
+    console.log(
+      `║ Fuel/Lap:     ${String((fuelPerLap / 3600).toFixed(2) + ' L/h').padEnd(32)} ║`,
+    );
+    console.log(
+      `║ Water Temp:   ${String(waterTemp.toFixed(1) + ' °C').padEnd(32)} ║`,
+    );
+    console.log(
+      `║ Oil Temp:     ${String(oilTemp.toFixed(1) + ' °C').padEnd(32)} ║`,
+    );
     console.log('╠═══════════════════════════════════════════════════╣');
-    console.log(`║ Lap:          ${String(lapCount + ' (' + (lapDistance * 100).toFixed(1) + '%)').padEnd(32)} ║`);
+    console.log(
+      `║ Lap:          ${String(lapCount + ' (' + (lapDistance * 100).toFixed(1) + '%)').padEnd(32)} ║`,
+    );
     console.log('╚═══════════════════════════════════════════════════╝');
 
     ir.unfreezeVarBufferLatest();
@@ -75,4 +95,3 @@ async function main() {
 }
 
 main().catch(console.error);
-

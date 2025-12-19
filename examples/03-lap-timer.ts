@@ -71,11 +71,11 @@ async function main() {
 
       if (improvement > 0) {
         console.log(
-          `║ Status:      ${`IMPROVED by ${formatTime(improvement)}`.padEnd(32)} ║`
+          `║ Status:      ${`IMPROVED by ${formatTime(improvement)}`.padEnd(32)} ║`,
         );
       } else if (improvement < 0) {
         console.log(
-          `║ Status:      ${`SLOWER by ${formatTime(-improvement)}`.padEnd(32)} ║`
+          `║ Status:      ${`SLOWER by ${formatTime(-improvement)}`.padEnd(32)} ║`,
         );
       } else {
         console.log(`║ Status:      ${`EQUAL TO BEST`.padEnd(32)} ║`);
@@ -121,4 +121,3 @@ function formatTime(seconds: number): string {
 }
 
 main().catch(console.error);
-

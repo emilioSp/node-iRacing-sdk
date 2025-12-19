@@ -34,7 +34,10 @@ export class IRSDKStruct {
 
   protected getStringValue(offset: number, maxLength: number): string {
     const absoluteOffset = this._offset + offset;
-    const buffer = this._sharedMem.slice(absoluteOffset, absoluteOffset + maxLength);
+    const buffer = this._sharedMem.slice(
+      absoluteOffset,
+      absoluteOffset + maxLength,
+    );
     const nullIndex = buffer.indexOf(0);
     const actualBuffer = nullIndex === -1 ? buffer : buffer.slice(0, nullIndex);
     return actualBuffer.toString('latin1');
@@ -118,7 +121,10 @@ export class VarBuffer extends IRSDKStruct {
   }
 
   freeze(): void {
-    this._frozenMemory = this._sharedMem.slice(this._bufOffset, this._bufOffset + this._bufLen);
+    this._frozenMemory = this._sharedMem.slice(
+      this._bufOffset,
+      this._bufOffset + this._bufLen,
+    );
     this._isFrozen = true;
   }
 
@@ -128,7 +134,9 @@ export class VarBuffer extends IRSDKStruct {
   }
 
   getMemory(): Buffer {
-    return this._isFrozen && this._frozenMemory ? this._frozenMemory : this._sharedMem;
+    return this._isFrozen && this._frozenMemory
+      ? this._frozenMemory
+      : this._sharedMem;
   }
 }
 
@@ -166,7 +174,7 @@ export class DiskSubHeader extends IRSDKStruct {
   get sessionStartDate(): number {
     const lo = this.getValue(0, 'i');
     const hi = this.getValue(4, 'i');
-    return (hi * 0x100000000) + (lo >>> 0);
+    return hi * 0x100000000 + (lo >>> 0);
   }
 
   get sessionStartTime(): number {
@@ -185,4 +193,3 @@ export class DiskSubHeader extends IRSDKStruct {
     return this.getValue(28, 'i');
   }
 }
-

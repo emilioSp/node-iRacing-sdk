@@ -13,12 +13,16 @@ async function main() {
   const connected = await ir.startup();
 
   if (!connected) {
-    console.error('Failed to connect to iRacing. Make sure iRacing is running!');
+    console.error(
+      'Failed to connect to iRacing. Make sure iRacing is running!',
+    );
     process.exit(1);
   }
 
   console.log('✓ Connected to iRacing');
-  console.log(`Available telemetry variables: ${ir.varHeadersNamesList.length}\n`);
+  console.log(
+    `Available telemetry variables: ${ir.varHeadersNamesList.length}\n`,
+  );
 
   // Read some telemetry data
   console.log('=== Current Telemetry ===');
@@ -41,4 +45,3 @@ async function main() {
 }
 
 main().catch(console.error);
-

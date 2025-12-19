@@ -44,7 +44,7 @@ export function parseIRSDKYaml(yamlStr: string): any {
     (match, prefix, value) => {
       const escaped = value.replace(/["\\\n]/g, (c: string) => '\\' + c);
       return prefix + '"' + escaped + '"';
-    }
+    },
   );
 
   // Handle values starting with comma
@@ -61,7 +61,12 @@ export function parseIRSDKYaml(yamlStr: string): any {
 /**
  * Extract a section from YAML binary data
  */
-export function extractYamlSection(sharedMem: Buffer, offset: number, len: number, sectionName: string): Buffer | null {
+export function extractYamlSection(
+  sharedMem: Buffer,
+  offset: number,
+  len: number,
+  sectionName: string,
+): Buffer | null {
   const start = offset;
   const end = start + len;
 
@@ -139,13 +144,16 @@ export async function checkSimStatus(): Promise<boolean> {
   try {
     const http = require('http');
     return new Promise((resolve) => {
-      const req = http.get('http://127.0.0.1:32034/get_sim_status?object=simStatus', (res: any) => {
-        let data = '';
-        res.on('data', (chunk: string) => (data += chunk));
-        res.on('end', () => {
-          resolve(data.includes('running:1'));
-        });
-      });
+      const req = http.get(
+        'http://127.0.0.1:32034/get_sim_status?object=simStatus',
+        (res: any) => {
+          let data = '';
+          res.on('data', (chunk: string) => (data += chunk));
+          res.on('end', () => {
+            resolve(data.includes('running:1'));
+          });
+        },
+      );
 
       req.on('error', () => {
         resolve(false);
@@ -160,4 +168,3 @@ export async function checkSimStatus(): Promise<boolean> {
     return false;
   }
 }
-
