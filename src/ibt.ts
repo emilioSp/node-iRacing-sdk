@@ -8,23 +8,12 @@ import { DiskSubHeader, Header, VarHeader } from './structs.js';
 
 export class IBT {
   private ibtFile: fs.ReadStream | null = null;
-  private sharedMem: Buffer | null = null;
+  private fileData: Buffer | null = null;
   private header: Header | null = null;
   private diskHeader: DiskSubHeader | null = null;
-
   private varHeaders: VarHeader[] | null = null;
   private varHeadersDict: Map<string, VarHeader> = new Map();
   private varHeadersNames: string[] | null = null;
-
-  get fileName(): string | null {
-    return this.ibtFile ? (this.ibtFile as any).path : null;
-  }
-
-  get varHeaderBufferTick(): number | null {
-    return this.header && this.header.varBuf[0]
-      ? this.header.varBuf[0].tickCount
-      : null;
-  }
 
   get varHeadersNamesList(): string[] | null {
     if (!this.header) {
@@ -43,12 +32,11 @@ export class IBT {
    */
   open(ibtFilePath: string): void {
     this.ibtFile = fs.createReadStream(ibtFilePath);
-    const fileData = fs.readFileSync(ibtFilePath);
-    this.sharedMem = fileData;
+    this.fileData = fs.readFileSync(ibtFilePath);
 
-    if (this.sharedMem) {
-      this.header = new Header(this.sharedMem);
-      this.diskHeader = new DiskSubHeader(this.sharedMem, 112);
+    if (this.fileData) {
+      this.header = new Header(this.fileData);
+      this.diskHeader = new DiskSubHeader(this.fileData, 112);
     }
   }
 
@@ -61,7 +49,7 @@ export class IBT {
       this.ibtFile = null;
     }
 
-    this.sharedMem = null;
+    this.fileData = null;
     this.header = null;
     this.diskHeader = null;
 
@@ -74,7 +62,7 @@ export class IBT {
    * Get value at specific index
    */
   get(index: number, key: string): any {
-    if (!this.header || !this.diskHeader || !this.sharedMem) {
+    if (!this.header || !this.diskHeader || !this.fileData) {
       return null;
     }
 
@@ -97,20 +85,10 @@ export class IBT {
   }
 
   /**
-   * Get value at latest index (alias)
-   */
-  operator_getitem(key: string): any {
-    if (!this.diskHeader) {
-      return null;
-    }
-    return this.get(this.diskHeader.sessionRecordCount - 1, key);
-  }
-
-  /**
    * Get all values for a key across all records
    */
   getAll(key: string): any[] | null {
-    if (!this.header || !this.diskHeader || !this.sharedMem) {
+    if (!this.header || !this.diskHeader || !this.fileData) {
       return null;
     }
 
@@ -139,13 +117,13 @@ export class IBT {
   // Private methods
 
   private getVarHeaders(): VarHeader[] {
-    if (!this.varHeaders && this.header && this.sharedMem) {
+    if (!this.varHeaders && this.header && this.fileData) {
       this.varHeaders = [];
       this.varHeadersDict.clear();
 
       for (let i = 0; i < this.header.numVars; i++) {
         const varHeader = new VarHeader(
-          this.sharedMem,
+          this.fileData,
           this.header.varHeaderOffset + i * 144,
         );
         this.varHeaders.push(varHeader);
@@ -157,7 +135,7 @@ export class IBT {
   }
 
   private unpackValues(offset: number, typeChar: string, count: number): any {
-    if (!this.sharedMem) {
+    if (!this.fileData) {
       return null;
     }
 
@@ -174,23 +152,23 @@ export class IBT {
   }
 
   private unpackSingleValue(offset: number, typeChar: string): any {
-    if (!this.sharedMem) {
+    if (!this.fileData) {
       return null;
     }
 
     switch (typeChar) {
       case 'i':
-        return this.sharedMem.readInt32LE(offset);
+        return this.fileData.readInt32LE(offset);
       case 'I':
-        return this.sharedMem.readUInt32LE(offset);
+        return this.fileData.readUInt32LE(offset);
       case 'f':
-        return this.sharedMem.readFloatLE(offset);
+        return this.fileData.readFloatLE(offset);
       case 'd':
-        return this.sharedMem.readDoubleLE(offset);
+        return this.fileData.readDoubleLE(offset);
       case '?':
-        return this.sharedMem.readUInt8(offset) !== 0;
+        return this.fileData.readUInt8(offset) !== 0;
       case 'c':
-        return this.sharedMem.readUInt8(offset);
+        return this.fileData.readUInt8(offset);
       default:
         return 0;
     }
