@@ -1,76 +1,57 @@
-/**
- * Utility functions for iRacing SDK
- */
-
 import * as yaml from 'js-yaml';
 import { YAML_TRANSLATER } from './constants.js';
 
-/**
- * Translate and clean YAML data from iRacing shared memory
- */
-export function translateYamlData(data: Buffer): string {
-  // Replace non-printable characters
+export const translateYamlData = (data: Buffer): string => {
   let buffer = Buffer.from(data);
 
-  // Apply YAML_TRANSLATER
   for (const [from, to] of Object.entries(YAML_TRANSLATER)) {
     for (let i = 0; i < buffer.length; i++) {
-      if (buffer[i] === parseInt(from)) {
+      if (buffer[i] === parseInt(from, 10)) {
         buffer[i] = to;
       }
     }
   }
 
-  // Remove trailing nulls and decode
   const nullIndex = buffer.indexOf(0);
   if (nullIndex !== -1) {
     buffer = buffer.slice(0, nullIndex);
   }
 
-  // Use latin1 encoding which is compatible with cp1252 for most characters
   return buffer.toString('latin1');
-}
+};
 
-/**
- * Parse YAML and handle iRacing-specific formatting
- */
-export function parseIRSDKYaml(yamlStr: string): any {
-  // Remove non-printable characters
+// biome-ignore lint/suspicious/noExplicitAny: YAML data is dynamically typed
+export const parseIRSDKYaml = (yamlStr: string): any => {
   let cleanStr = yamlStr.replace(/[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]/g, '');
 
-  // Handle driver info names with special characters
   cleanStr = cleanStr.replace(
     /((?:DriverSetupName|UserName|TeamName|AbbrevName|Initials): )(.*)/g,
-    (match, prefix, value) => {
-      const escaped = value.replace(/["\\\n]/g, (c: string) => '\\' + c);
-      return prefix + '"' + escaped + '"';
+    (_match, prefix, value) => {
+      const escaped = value.replace(/["\\\n]/g, (c: string) => `\\${c}`);
+      return `${prefix}"${escaped}"`;
     },
   );
 
-  // Handle values starting with comma
   cleanStr = cleanStr.replace(/(\w+: )(,.*)/g, '$1"$2"');
 
   try {
+    // biome-ignore lint/suspicious/noExplicitAny: YAML data is dynamically typed
     return yaml.load(cleanStr) as any;
   } catch (error) {
     console.error('Failed to parse YAML:', error);
     return null;
   }
-}
+};
 
-/**
- * Extract a section from YAML binary data
- */
-export function extractYamlSection(
+export const extractYamlSection = (
   sharedMem: Buffer,
   offset: number,
   len: number,
   sectionName: string,
-): Buffer | null {
+): Buffer | null => {
   const start = offset;
   const end = start + len;
 
-  // Search for section header
   const searchPattern = `\n${sectionName}:\n`;
   const searchBuffer = Buffer.from(searchPattern, 'utf-8');
 
@@ -84,7 +65,7 @@ export function extractYamlSection(
       }
     }
     if (found) {
-      matchStart = i + 1; // Skip the leading newline
+      matchStart = i + 1;
       break;
     }
   }
@@ -93,7 +74,6 @@ export function extractYamlSection(
     return null;
   }
 
-  // Search for end (double newline)
   const endPattern = '\n\n';
   const endBuffer = Buffer.from(endPattern, 'utf-8');
 
@@ -113,12 +93,9 @@ export function extractYamlSection(
   }
 
   return sharedMem.slice(matchStart, matchEnd);
-}
+};
 
-/**
- * Pad car number for broadcast message
- */
-export function padCarNumber(num: string | number): number {
+export const padCarNumber = (num: string | number): number => {
   const numStr = String(num);
   const numLen = numStr.length;
   let zero = numLen - numStr.replace(/^0+/, '').length;
@@ -135,36 +112,22 @@ export function padCarNumber(num: string | number): number {
   }
 
   return parsedNum;
-}
+};
 
-/**
- * Check if iRacing is running via HTTP status check
- */
-export async function checkSimStatus(): Promise<boolean> {
+export const checkSimStatus = async (): Promise<boolean> => {
   try {
-    const http = require('http');
-    return new Promise((resolve) => {
-      const req = http.get(
-        'http://127.0.0.1:32034/get_sim_status?object=simStatus',
-        (res: any) => {
-          let data = '';
-          res.on('data', (chunk: string) => (data += chunk));
-          res.on('end', () => {
-            resolve(data.includes('running:1'));
-          });
-        },
-      );
+    const response = await fetch(
+      'http://127.0.0.1:32034/get_sim_status?object=simStatus',
+      { signal: AbortSignal.timeout(5000) },
+    );
 
-      req.on('error', () => {
-        resolve(false);
-      });
+    if (!response.ok) {
+      return false;
+    }
 
-      req.setTimeout(5000, () => {
-        req.destroy();
-        resolve(false);
-      });
-    });
+    const data = await response.text();
+    return data.includes('running:1');
   } catch {
     return false;
   }
-}
+};

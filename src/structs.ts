@@ -1,7 +1,3 @@
-/**
- * Binary data structures for iRacing SDK
- */
-
 export class IRSDKStruct {
   protected _sharedMem: Buffer;
   protected _offset: number;
@@ -11,6 +7,7 @@ export class IRSDKStruct {
     this._offset = offset;
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: Binary data can be various primitive types
   protected getValue(offset: number, type: string): any {
     const absoluteOffset = this._offset + offset;
 

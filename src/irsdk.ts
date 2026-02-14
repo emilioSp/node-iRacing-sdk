@@ -1,9 +1,5 @@
-/**
- * Main IRSDK class for communicating with iRacing
- */
-
-import { EventEmitter } from 'events';
-import * as fs from 'fs';
+import { EventEmitter } from 'node:events';
+import * as fs from 'node:fs';
 import {
   BROADCASTMSGNAME,
   BroadcastMsg,
@@ -34,13 +30,15 @@ import {
   translateYamlData,
 } from './utils.js';
 
-interface SessionInfoCache {
+type SessionInfoCache = {
+  // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
   data: any | null;
+  // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
   dataLast?: any;
   dataBinary?: Buffer;
   asyncSessionInfoUpdate?: number;
   update?: number;
-}
+};
 
 export class IRSDK extends EventEmitter {
   private isInitialized: boolean = false;
@@ -49,6 +47,7 @@ export class IRSDK extends EventEmitter {
 
   private sharedMem: Buffer | null = null;
   private header: Header | null = null;
+  // biome-ignore lint/suspicious/noExplicitAny: Windows API handle type varies
   private dataValidEvent: any = null;
 
   private varHeaders: VarHeader[] | null = null;
@@ -62,36 +61,31 @@ export class IRSDK extends EventEmitter {
 
   private broadcastMsgId: number | null = null;
 
+  // biome-ignore lint/suspicious/noExplicitAny: Windows FFI binding is dynamically typed
   private windowsApi: any = null;
 
   constructor(parseYamlAsync: boolean = false) {
     super();
     this.parseYamlAsync = parseYamlAsync;
 
-    // Try to load Windows APIs (will only work on Windows)
     if (process.platform === 'win32') {
       this.initializeWindowsApi();
     }
   }
 
-  /**
-   * Initialize Windows API bindings asynchronously
-   */
   private async initializeWindowsApi(): Promise<void> {
     try {
-      // Dynamically import FFI for Windows APIs
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       // @ts-expect-error - ffi-napi is an optional dependency
+      // biome-ignore lint/suspicious/noExplicitAny: FFI binding is dynamically typed
       const ffiModule = await (import('ffi-napi') as Promise<any>);
       const ffi = ffiModule.default || ffiModule;
 
-      // Dynamically import ref for type definitions (may be needed by ffi-napi)
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         // @ts-expect-error - ref-napi is an optional dependency
+        // biome-ignore lint/suspicious/noExplicitAny: FFI binding is dynamically typed
         await (import('ref-napi') as Promise<any>);
       } catch {
-        // ref-napi is optional, ffi-napi might bundle it
+        // ref-napi is optional
       }
 
       // Load user32.dll for RegisterWindowMessageW and SendNotifyMessageW
@@ -100,7 +94,6 @@ export class IRSDK extends EventEmitter {
         SendNotifyMessageW: ['bool', ['uint', 'uint', 'uint', 'uint']],
       });
 
-      // Also try to load kernel32.dll for event handling
       try {
         const kernel32 = ffi.Library('kernel32.dll', {
           OpenEventW: ['pointer', ['uint', 'bool', 'string']],
@@ -112,26 +105,20 @@ export class IRSDK extends EventEmitter {
         // Kernel32 functions may not be critical
       }
     } catch {
-      // FFI not available - broadcast messages won't work but regular telemetry will
       console.debug(
-        'Windows API libraries not available. Broadcast messages will not work.',
+        'Windows API libraries not available. Broadcast messages will not work, but regular telemetry access should still function on supported platforms.',
       );
     }
   }
 
-  /**
-   * Initialize and connect to iRacing
-   */
   async startup(testFile?: string, dumpTo?: string): Promise<boolean> {
     try {
-      // Check if sim is running
       if (!testFile) {
         const isRunning = await checkSimStatus();
         if (!isRunning) {
           console.warn('iRacing does not appear to be running');
         }
 
-        // Try to open data valid event (Windows only)
         if (this.windowsApi) {
           this.dataValidEvent = this.windowsApi.OpenEventW(
             0x00100000,
@@ -141,13 +128,11 @@ export class IRSDK extends EventEmitter {
         }
       }
 
-      // Wait for valid data
       if (!(await this.waitValidDataEvent())) {
         this.dataValidEvent = null;
         return false;
       }
 
-      // Open shared memory
       if (!this.sharedMem) {
         if (testFile) {
           this.testFile = fs.createReadStream(testFile);
@@ -167,12 +152,10 @@ export class IRSDK extends EventEmitter {
       }
 
       if (this.sharedMem) {
-        // Dump to file if requested
         if (dumpTo) {
           fs.writeFileSync(dumpTo, this.sharedMem);
         }
 
-        // Initialize header
         this.header = new Header(this.sharedMem);
         this.isInitialized =
           this.header.version >= 1 && this.header.varBuf.length > 0;
@@ -185,15 +168,11 @@ export class IRSDK extends EventEmitter {
     }
   }
 
-  /**
-   * Disconnect from iRacing
-   */
   shutdown(): void {
     this.isInitialized = false;
     this.lastSessionInfoUpdate = 0;
 
     if (this.sharedMem) {
-      // No need to explicitly close Buffer
       this.sharedMem = null;
     }
 
@@ -211,15 +190,12 @@ export class IRSDK extends EventEmitter {
     }
   }
 
-  /**
-   * Get telemetry value by key
-   */
+  // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
   get(key: string): any {
     if (!this.isInitialized || !this.header) {
       return undefined;
     }
 
-    // Check if it's a telemetry variable
     const varHeader = this.varHeadersDict.get(key);
     if (varHeader) {
       const varBufLatest = this.getVarBufferLatest();
@@ -234,6 +210,7 @@ export class IRSDK extends EventEmitter {
       if (varHeader.count === 1) {
         return this.unpackValue(memory, offset, typeChar);
       } else {
+        // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
         const result: any[] = [];
         for (let i = 0; i < varHeader.count; i++) {
           result.push(
@@ -248,13 +225,9 @@ export class IRSDK extends EventEmitter {
       }
     }
 
-    // Otherwise try to get from session info
     return this.getSessionInfo(key);
   }
 
-  /**
-   * Check if connected to iRacing
-   */
   get isConnected(): boolean {
     if (!this.header) {
       return false;
@@ -293,16 +266,10 @@ export class IRSDK extends EventEmitter {
     );
   }
 
-  /**
-   * Get session info update counter
-   */
   get sessionInfoUpdate(): number {
     return this.header?.sessionInfoUpdate ?? 0;
   }
 
-  /**
-   * Get list of available telemetry variable names
-   */
   get varHeadersNamesList(): string[] {
     if (!this.varHeadersNames && this.header) {
       this.varHeadersNames = this.getVarHeaders().map((h) => h.name);
@@ -310,9 +277,6 @@ export class IRSDK extends EventEmitter {
     return this.varHeadersNames || [];
   }
 
-  /**
-   * Freeze the latest var buffer for consistent reads
-   */
   freezeVarBufferLatest(): void {
     this.unfreezeVarBufferLatest();
     this.waitValidDataEventSync();
@@ -326,17 +290,12 @@ export class IRSDK extends EventEmitter {
     }
   }
 
-  /**
-   * Unfreeze the var buffer
-   */
   unfreezeVarBufferLatest(): void {
     if (this.varBufferLatest) {
       this.varBufferLatest.unfreeze();
       this.varBufferLatest = null;
     }
   }
-
-  // Broadcast message methods
 
   camSwitchPos(
     position: number = 0,
@@ -501,6 +460,7 @@ export class IRSDK extends EventEmitter {
     return sorted.length > 1 ? sorted[1] : sorted[0];
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: Session data is dynamically typed
   private getSessionInfo(key: string): any {
     if (this.lastSessionInfoUpdate < this.sessionInfoUpdate) {
       this.lastSessionInfoUpdate = this.sessionInfoUpdate;
@@ -517,7 +477,10 @@ export class IRSDK extends EventEmitter {
       this.sessionInfoDict.set(key, { data: null });
     }
 
-    const cache = this.sessionInfoDict.get(key)!;
+    const cache = this.sessionInfoDict.get(key);
+    if (!cache) {
+      return null;
+    }
 
     if (cache.data) {
       return cache.data;
@@ -651,6 +614,7 @@ export class IRSDK extends EventEmitter {
     return this.broadcastMsgId;
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
   private unpackValue(buffer: Buffer, offset: number, typeChar: string): any {
     switch (typeChar) {
       case 'i':
@@ -701,5 +665,3 @@ export class IRSDK extends EventEmitter {
     });
   }
 }
-
-export default IRSDK;

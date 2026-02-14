@@ -37,8 +37,8 @@ async function main() {
 
     const lapCount = ir.get('LapCount') || 0;
     const lastLapTime = ir.get('LastLapTime') || 0;
-    const sessionBestLapTime = ir.get('SessionBestLapTime') || 0;
-    const personalBestLapTime = ir.get('PersonalBestLapTime') || 0;
+    const _sessionBestLapTime = ir.get('SessionBestLapTime') || 0;
+    const _personalBestLapTime = ir.get('PersonalBestLapTime') || 0;
 
     // Check if we completed a new lap
     if (lapCount > lastLapCount && lastLapTime > 0) {
@@ -84,7 +84,7 @@ async function main() {
       console.log('╠════════════════════════════════════════════╣');
       console.log('║ Recent Laps:                               ║');
       const recentLaps = laps.slice(-5).reverse();
-      recentLaps.forEach((lap, i) => {
+      recentLaps.forEach((lap, _i) => {
         const lapStr = `Lap ${lap.lapNumber}: ${formatTime(lap.time)}`;
         console.log(`║   ${lapStr.padEnd(40)} ║`);
       });

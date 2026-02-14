@@ -1,8 +1,4 @@
-/**
- * IBT file reader for iRacing telemetry replay files
- */
-
-import * as fs from 'fs';
+import * as fs from 'node:fs';
 import { VAR_TYPE_MAP } from './constants.js';
 import { DiskSubHeader, Header, VarHeader } from './structs.js';
 
@@ -58,9 +54,7 @@ export class IBT {
     this.varHeadersNames = null;
   }
 
-  /**
-   * Get value at specific index
-   */
+  // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
   get(index: number, key: string): any {
     if (!this.header || !this.diskHeader || !this.fileData) {
       return null;
@@ -84,9 +78,7 @@ export class IBT {
     return this.unpackValues(varOffset, typeChar, varHeader.count);
   }
 
-  /**
-   * Get all values for a key across all records
-   */
+  // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
   getAll(key: string): any[] | null {
     if (!this.header || !this.diskHeader || !this.fileData) {
       return null;
@@ -98,6 +90,7 @@ export class IBT {
     }
 
     const typeChar = VAR_TYPE_MAP[varHeader.type];
+    // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
     const results: any[] = [];
     const bufLen = this.header.bufLen;
     const varOffset = varHeader.offset + this.header.varBuf[0]._bufOffset;
@@ -134,6 +127,7 @@ export class IBT {
     return this.varHeaders || [];
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
   private unpackValues(offset: number, typeChar: string, count: number): any {
     if (!this.fileData) {
       return null;
@@ -142,6 +136,7 @@ export class IBT {
     if (count === 1) {
       return this.unpackSingleValue(offset, typeChar);
     } else {
+      // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
       const results: any[] = [];
       const typeSize = this.getTypeSize(typeChar);
       for (let i = 0; i < count; i++) {
@@ -151,6 +146,7 @@ export class IBT {
     }
   }
 
+  // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
   private unpackSingleValue(offset: number, typeChar: string): any {
     if (!this.fileData) {
       return null;
@@ -190,5 +186,3 @@ export class IBT {
     }
   }
 }
-
-export default IBT;

@@ -1,7 +1,3 @@
-/**
- * iRacing SDK Constants and Enums
- */
-
 export const VERSION = '1.3.5';
 
 export const SIM_STATUS_URL =

@@ -1,9 +1,3 @@
-/**
- * iRacing SDK for Node.js
- * Main entry point
- */
-
-// Export constants and enums
 export {
   BROADCASTMSGNAME,
   BroadcastMsg,
@@ -37,11 +31,10 @@ export {
   VERSION,
   VideoCaptureMode,
 } from './constants.js';
-export { IBT } from './ibt.js';
-// Export main classes
-export { default, IRSDK } from './irsdk.js';
 
-// Export struct classes for advanced usage
+export { IBT } from './ibt.js';
+export { IRSDK } from './irsdk.js';
+
 export {
   DiskSubHeader,
   Header,
@@ -50,7 +43,6 @@ export {
   VarHeader,
 } from './structs.js';
 
-// Export utilities
 export {
   checkSimStatus,
   extractYamlSection,
