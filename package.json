@@ -1,5 +1,5 @@
 {
-  "name": "node-iracing-sdk",
+  "name": "@emiliosp/node-iracing-sdk",
   "version": "1.0.0",
   "author": "Emilio Spatola",
   "description": "Node.js implementation of iRacing SDK",

@@ -12,7 +12,7 @@ The SDK can:
 
 ### Requirements
 
-- Node.js 14+
+- Node.js 24+
 - Windows (iRacing only runs on Windows)
 - npm or yarn
 
@@ -85,5 +85,3 @@ if (sessionState === SessionState.racing) {
 // Set camera state
 ir.camSetState(CameraState.cam_tool_active | CameraState.ui_hidden);
 ```
-
-Go to [tutorials](tutorials) for more examples and advanced usage.
