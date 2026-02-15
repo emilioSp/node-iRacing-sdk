@@ -1,6 +1,6 @@
 {
   "name": "nodeirsdk",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "author": "Emilio Spatola",
   "description": "Node.js implementation of iRacing SDK",
   "keywords": [
