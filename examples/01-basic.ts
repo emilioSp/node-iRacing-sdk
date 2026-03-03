@@ -4,7 +4,7 @@
  * This is the simplest example - connect to iRacing and read some telemetry data
  */
 
-import { IRSDK } from '../src/index.js';
+import { IRSDK } from '../src/index.ts';
 
 async function main() {
   const ir = new IRSDK();

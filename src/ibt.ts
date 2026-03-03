@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
-import { VAR_TYPE_MAP } from './constants.js';
-import { DiskSubHeader, Header, VarHeader } from './structs.js';
+import { VAR_TYPE_MAP } from './constants.ts';
+import { DiskSubHeader, Header, VarHeader } from './structs.ts';
 
 export class IBT {
   private ibtFile: fs.ReadStream | null = null;

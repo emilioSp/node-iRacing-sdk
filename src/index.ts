@@ -30,10 +30,10 @@ export {
   VAR_TYPE_MAP,
   VERSION,
   VideoCaptureMode,
-} from './constants.js';
+} from './constants.ts';
 
-export { IBT } from './ibt.js';
-export { IRSDK } from './irsdk.js';
+export { IBT } from './ibt.ts';
+export { IRSDK } from './irsdk.ts';
 
 export {
   DiskSubHeader,
@@ -41,7 +41,7 @@ export {
   IRSDKStruct,
   VarBuffer,
   VarHeader,
-} from './structs.js';
+} from './structs.ts';
 
 export {
   checkSimStatus,
@@ -49,4 +49,4 @@ export {
   padCarNumber,
   parseIRSDKYaml,
   translateYamlData,
-} from './utils.js';
+} from './utils.ts';

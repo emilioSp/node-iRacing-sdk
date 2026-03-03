@@ -1,5 +1,5 @@
 import * as yaml from 'js-yaml';
-import { YAML_TRANSLATER } from './constants.js';
+import { YAML_TRANSLATER } from './constants.ts';
 
 export const translateYamlData = (data: Buffer): string => {
   let buffer = Buffer.from(data);

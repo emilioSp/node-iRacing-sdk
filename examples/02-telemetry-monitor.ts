@@ -4,7 +4,7 @@
  * Display live telemetry data in the terminal, updated every 100ms
  */
 
-import { IRSDK } from '../src/index.js';
+import { IRSDK } from '../src/index.ts';
 
 async function main() {
   const ir = new IRSDK();

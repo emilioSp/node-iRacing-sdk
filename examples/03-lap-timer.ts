@@ -4,7 +4,7 @@
  * Track lap times and show best lap, average, and improvement
  */
 
-import { IRSDK } from '../src/index.js';
+import { IRSDK } from '../src/index.ts';
 
 interface LapRecord {
   lapNumber: number;

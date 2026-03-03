@@ -16,19 +16,19 @@ import {
   TelemCommandMode,
   VAR_TYPE_MAP,
   VideoCaptureMode,
-} from './constants.js';
+} from './constants.ts';
 import {
   Header,
   type VarBuffer as VarBufferClass,
   VarHeader,
-} from './structs.js';
+} from './structs.ts';
 import {
   checkSimStatus,
   extractYamlSection,
   padCarNumber,
   parseIRSDKYaml,
   translateYamlData,
-} from './utils.js';
+} from './utils.ts';
 
 type SessionInfoCache = {
   // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed

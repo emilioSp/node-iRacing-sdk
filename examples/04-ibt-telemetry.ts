@@ -9,10 +9,10 @@
  * - Process specific telemetry values
  */
 
-import { IBT } from '../src/ibt.js';
+import { IBT } from '../src/ibt.ts';
 
 // Path to your IBT file (replace with your actual IBT file path)
-const ibtFilePath = '../telemetry/porsche_gt3_miami.ibt';
+const ibtFilePath = '../telemetry/corvette_gt3.ibt';
 
 // Initialize the IBT reader
 const ibt = new IBT();
@@ -36,7 +36,7 @@ try {
   const varNames = ibt.varHeadersNamesList;
   console.log('\n--- Available Variables ---');
   console.log(`Total variables: ${varNames?.length}`);
-  console.log('First 20 variables:', varNames?.slice(0, 20).join(', '));
+  console.log('List variables:', JSON.stringify(varNames));
 
   // Get all telemetry values for a specific variable across all records
   console.log('\n--- Speed Data Across All Records ---');
@@ -51,7 +51,7 @@ try {
   }
 
   // Get specific record at index
-  const index = 50_000;
+  const index = 1_000;
   console.log(`--- Telemetry at Index ${index} ---`);
 
   const speed = ibt.get(index, 'Speed');
@@ -61,6 +61,7 @@ try {
   const throttle = ibt.get(index, 'Throttle');
   const brake = ibt.get(index, 'Brake');
   const gear = ibt.get(index, 'Gear');
+  console.log(`Car dist ahead: ${ibt.get(index, 'CarDistAhead')}`);
 
   console.log(`Speed: ${speed} km/h`);
   console.log(`Lap: ${lap}`);
