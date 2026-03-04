@@ -68,6 +68,8 @@ export class IRSDK extends EventEmitter {
   private windowsApiReady: Promise<void> | null = null;
   // biome-ignore lint/suspicious/noExplicitAny: Windows memory map handle
   private memMapHandle: any = null;
+  // biome-ignore lint/suspicious/noExplicitAny: Windows mapped view pointer
+  private memMapView: any = null;
 
   constructor(parseYamlAsync: boolean = false) {
     super();
@@ -80,39 +82,25 @@ export class IRSDK extends EventEmitter {
 
   private async initializeWindowsApi(): Promise<void> {
     try {
-      // @ts-expect-error - ffi-napi is an optional dependency
+      // @ts-expect-error - koffi is an optional dependency
       // biome-ignore lint/suspicious/noExplicitAny: FFI binding is dynamically typed
-      const ffiModule = await (import('ffi-napi') as Promise<any>);
-      const ffi = ffiModule.default || ffiModule;
+      const koffiModule = await (import('koffi') as Promise<any>);
+      const koffi = koffiModule.default || koffiModule;
 
-      try {
-        // @ts-expect-error - ref-napi is an optional dependency
-        // biome-ignore lint/suspicious/noExplicitAny: FFI binding is dynamically typed
-        await (import('ref-napi') as Promise<any>);
-      } catch (e) {
-        // ref-napi is optional
-        console.debug('Failed to load ref-napi. Windows API calls may not work without it.', e);
-      }
+      const user32 = koffi.load('user32.dll');
+      const kernel32 = koffi.load('kernel32.dll');
 
-      // Load user32.dll for RegisterWindowMessageW and SendNotifyMessageW
-      this.windowsApi = ffi.Library('user32.dll', {
-        RegisterWindowMessageW: ['uint', ['string']],
-        SendNotifyMessageW: ['bool', ['uint', 'uint', 'uint', 'uint']],
-      });
-
-      try {
-        const kernel32 = ffi.Library('kernel32.dll', {
-          OpenEventW: ['pointer', ['uint', 'bool', 'string']],
-          WaitForSingleObject: ['uint', ['pointer', 'uint']],
-          CloseHandle: ['bool', ['pointer']],
-          OpenFileMappingW: ['pointer', ['uint', 'bool', 'string']],
-          MapViewOfFile: ['pointer', ['pointer', 'uint', 'uint', 'uint', 'size_t']],
-          UnmapViewOfFile: ['bool', ['pointer']],
-        });
-        Object.assign(this.windowsApi, kernel32);
-      } catch (e) {
-        console.debug('Failed to load OpenFileMappingW, MapViewOfFile, or UnmapViewOfFile.', e);
-      }
+      this.windowsApi = {
+        RegisterWindowMessageW: user32.func('uint RegisterWindowMessageW(str16 lpString)'),
+        SendNotifyMessageW: user32.func('bool SendNotifyMessageW(uintptr_t hWnd, uint Msg, uint wParam, uint lParam)'),
+        OpenEventW: kernel32.func('void* OpenEventW(uint dwDesiredAccess, bool bInheritHandle, str16 lpName)'),
+        WaitForSingleObject: kernel32.func('uint WaitForSingleObject(void* hHandle, uint dwMilliseconds)'),
+        CloseHandle: kernel32.func('bool CloseHandle(void* hObject)'),
+        OpenFileMappingW: kernel32.func('void* OpenFileMappingW(uint dwDesiredAccess, bool bInheritHandle, str16 lpName)'),
+        MapViewOfFile: kernel32.func('void* MapViewOfFile(void* hFileMappingObject, uint dwDesiredAccess, uint dwFileOffsetHigh, uint dwFileOffsetLow, uintptr_t dwNumberOfBytesToMap)'),
+        UnmapViewOfFile: kernel32.func('bool UnmapViewOfFile(void* lpBaseAddress)'),
+        _koffi: koffi,
+      };
     } catch (e) {
       console.debug(
         'Windows API libraries not available. Broadcast messages will not work, but regular telemetry access should still function on supported platforms.', e
@@ -189,8 +177,10 @@ export class IRSDK extends EventEmitter {
     this.lastSessionInfoUpdate = 0;
 
     try {
-      this.windowsApi.UnmapViewOfFile(this.sharedMem as unknown as Buffer);
+      this.windowsApi.UnmapViewOfFile(this.memMapView);
+      this.memMapView = null;
       this.windowsApi.CloseHandle(this.memMapHandle);
+      this.memMapHandle = null;
     } catch (error) {
       // ignore cleanup errors
       console.debug('Error during shutdown cleanup, but ignoring:', error);
@@ -454,7 +444,7 @@ export class IRSDK extends EventEmitter {
     if (!this.windowsApi?.OpenFileMappingW || !this.windowsApi?.MapViewOfFile) {
       console.error(
         'Windows kernel32 APIs (OpenFileMappingW/MapViewOfFile) are not available. ' +
-        'Install ffi-napi and ref-napi: npm install ffi-napi ref-napi',
+        'Install koffi: npm install koffi',
       );
       return null;
     }
@@ -463,7 +453,7 @@ export class IRSDK extends EventEmitter {
       // FILE_MAP_READ = 0x0004
       const handle = this.windowsApi.OpenFileMappingW(0x0004, false, MEMMAPFILE);
 
-      if (!handle || handle.isNull()) {
+      if (!handle) {
         console.error(
           `Failed to open iRacing shared memory mapping "${MEMMAPFILE}". ` +
           'Ensure iRacing is running and the sim is active.',
@@ -476,19 +466,20 @@ export class IRSDK extends EventEmitter {
       // FILE_MAP_READ = 0x0004
       const view = this.windowsApi.MapViewOfFile(handle, 0x0004, 0, 0, MEMMAPFILESIZE);
 
-      if (!view || view.isNull()) {
+      if (!view) {
         console.error('Failed to map view of iRacing shared memory.');
         this.windowsApi.CloseHandle(handle);
         this.memMapHandle = null;
         return null;
       }
 
-      // Copy the mapped memory into a Node.js Buffer so we can work with it safely
-      const buffer = Buffer.alloc(MEMMAPFILESIZE);
-      view.reinterpret(MEMMAPFILESIZE).copy(buffer);
+      this.memMapView = view;
 
-      // Unmap after copying — we'll re-read on each refresh cycle
-      this.windowsApi.UnmapViewOfFile(view);
+      // Use koffi.decode to create a Node.js Buffer from the mapped memory pointer.
+      // This Buffer directly references the shared memory so reads always reflect
+      // iRacing's latest data.
+      const koffi = this.windowsApi._koffi;
+      const buffer: Buffer = koffi.decode(view, koffi.types.uint8, MEMMAPFILESIZE);
 
       return buffer;
     } catch (error) {
@@ -627,7 +618,7 @@ export class IRSDK extends EventEmitter {
   }
 
   private async waitValidDataEvent(): Promise<boolean> {
-    if (this.dataValidEvent && !this.dataValidEvent.isNull() && this.windowsApi?.WaitForSingleObject) {
+    if (this.dataValidEvent && this.windowsApi?.WaitForSingleObject) {
       const result = this.windowsApi.WaitForSingleObject(
         this.dataValidEvent,
         32,
