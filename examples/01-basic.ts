@@ -21,7 +21,7 @@ async function main() {
 
   console.log('✓ Connected to iRacing');
   console.log(
-    `Available telemetry variables: ${ir.varHeadersNamesList.length}\n`,
+    `Available telemetry variables: ${ir.getVarHeadersNamesList().length}\n`,
   );
 
   // Read some telemetry data

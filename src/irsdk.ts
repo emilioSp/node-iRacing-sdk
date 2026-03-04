@@ -174,6 +174,10 @@ export class IRSDK extends EventEmitter {
         this.header = new Header(this.sharedMem);
         this.isInitialized =
           this.header.version >= 1 && this.header.varBuf.length > 0;
+
+        if (this.isInitialized) {
+          this.initVarHeaders();
+        }
       }
 
       return this.isInitialized;
@@ -300,9 +304,12 @@ export class IRSDK extends EventEmitter {
     return this.header?.sessionInfoUpdate ?? 0;
   }
 
-  get varHeadersNamesList(): string[] {
+  getVarHeadersNamesList(): string[] {
     if (!this.varHeadersNames && this.header) {
-      this.varHeadersNames = this.getVarHeaders().map((h) => h.name);
+      if (this.varHeaders === null) {
+        throw new Error('Var headers not initialized');
+      }
+      this.varHeadersNames = this.varHeaders.map((h) => h.name);
     }
     return this.varHeadersNames || [];
   }
@@ -538,7 +545,7 @@ export class IRSDK extends EventEmitter {
     }
   }
 
-  private getVarHeaders(): VarHeader[] {
+  private initVarHeaders() {
     if (!this.varHeaders && this.header && this.sharedMem) {
       this.varHeaders = [];
       this.varHeadersDict.clear();
@@ -552,8 +559,6 @@ export class IRSDK extends EventEmitter {
         this.varHeadersDict.set(varHeader.name, varHeader);
       }
     }
-
-    return this.varHeaders || [];
   }
 
   private getVarBufferLatest(): VarBufferClass | null {
