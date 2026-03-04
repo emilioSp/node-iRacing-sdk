@@ -7,6 +7,8 @@ import {
   ChatCommandMode,
   DATAVALIDEVENTNAME,
   FFBCommandMode,
+  MEMMAPFILE,
+  MEMMAPFILESIZE,
   PitCommandMode,
   ReloadTexturesMode,
   RpyPosMode,
@@ -63,13 +65,16 @@ export class IRSDK extends EventEmitter {
 
   // biome-ignore lint/suspicious/noExplicitAny: Windows FFI binding is dynamically typed
   private windowsApi: any = null;
+  private windowsApiReady: Promise<void> | null = null;
+  // biome-ignore lint/suspicious/noExplicitAny: Windows memory map handle
+  private memMapHandle: any = null;
 
   constructor(parseYamlAsync: boolean = false) {
     super();
     this.parseYamlAsync = parseYamlAsync;
 
     if (process.platform === 'win32') {
-      this.initializeWindowsApi();
+      this.windowsApiReady = this.initializeWindowsApi();
     }
   }
 
@@ -84,8 +89,9 @@ export class IRSDK extends EventEmitter {
         // @ts-expect-error - ref-napi is an optional dependency
         // biome-ignore lint/suspicious/noExplicitAny: FFI binding is dynamically typed
         await (import('ref-napi') as Promise<any>);
-      } catch {
+      } catch (e) {
         // ref-napi is optional
+        console.debug('Failed to load ref-napi. Windows API calls may not work without it.', e);
       }
 
       // Load user32.dll for RegisterWindowMessageW and SendNotifyMessageW
@@ -99,27 +105,35 @@ export class IRSDK extends EventEmitter {
           OpenEventW: ['pointer', ['uint', 'bool', 'string']],
           WaitForSingleObject: ['uint', ['pointer', 'uint']],
           CloseHandle: ['bool', ['pointer']],
+          OpenFileMappingW: ['pointer', ['uint', 'bool', 'string']],
+          MapViewOfFile: ['pointer', ['pointer', 'uint', 'uint', 'uint', 'size_t']],
+          UnmapViewOfFile: ['bool', ['pointer']],
         });
         Object.assign(this.windowsApi, kernel32);
-      } catch {
-        // Kernel32 functions may not be critical
+      } catch (e) {
+        console.debug('Failed to load OpenFileMappingW, MapViewOfFile, or UnmapViewOfFile.', e);
       }
-    } catch {
+    } catch (e) {
       console.debug(
-        'Windows API libraries not available. Broadcast messages will not work, but regular telemetry access should still function on supported platforms.',
+        'Windows API libraries not available. Broadcast messages will not work, but regular telemetry access should still function on supported platforms.', e
       );
     }
   }
 
   async startup(testFile?: string, dumpTo?: string): Promise<boolean> {
     try {
+      // Ensure Windows API is fully initialized before proceeding
+      if (this.windowsApiReady) {
+        await this.windowsApiReady;
+      }
+
       if (!testFile) {
         const isRunning = await checkSimStatus();
         if (!isRunning) {
           console.warn('iRacing does not appear to be running');
         }
 
-        if (this.windowsApi) {
+        if (this.windowsApi?.OpenEventW) {
           this.dataValidEvent = this.windowsApi.OpenEventW(
             0x00100000,
             false,
@@ -139,12 +153,14 @@ export class IRSDK extends EventEmitter {
           const buffer = await this.readFileToBuffer(this.testFile);
           this.sharedMem = buffer;
         } else if (process.platform === 'win32') {
-          // For production, would need to use Windows APIs to open named shared memory
-          // For now, this is a placeholder
-          console.warn(
-            'Shared memory access on Windows requires additional setup',
-          );
-          return false;
+          const mem = this.openSharedMemory();
+          if (!mem) {
+            console.error(
+              'Failed to open iRacing shared memory. Make sure iRacing is running.',
+            );
+            return false;
+          }
+          this.sharedMem = mem;
         } else {
           console.error('iRacing SDK only works on Windows');
           return false;
@@ -171,6 +187,14 @@ export class IRSDK extends EventEmitter {
   shutdown(): void {
     this.isInitialized = false;
     this.lastSessionInfoUpdate = 0;
+
+    try {
+      this.windowsApi.UnmapViewOfFile(this.sharedMem as unknown as Buffer);
+      this.windowsApi.CloseHandle(this.memMapHandle);
+    } catch (error) {
+      // ignore cleanup errors
+      console.debug('Error during shutdown cleanup, but ignoring:', error);
+    }
 
     if (this.sharedMem) {
       this.sharedMem = null;
@@ -426,6 +450,53 @@ export class IRSDK extends EventEmitter {
 
   // Private methods
 
+  private openSharedMemory(): Buffer | null {
+    if (!this.windowsApi?.OpenFileMappingW || !this.windowsApi?.MapViewOfFile) {
+      console.error(
+        'Windows kernel32 APIs (OpenFileMappingW/MapViewOfFile) are not available. ' +
+        'Install ffi-napi and ref-napi: npm install ffi-napi ref-napi',
+      );
+      return null;
+    }
+
+    try {
+      // FILE_MAP_READ = 0x0004
+      const handle = this.windowsApi.OpenFileMappingW(0x0004, false, MEMMAPFILE);
+
+      if (!handle || handle.isNull()) {
+        console.error(
+          `Failed to open iRacing shared memory mapping "${MEMMAPFILE}". ` +
+          'Ensure iRacing is running and the sim is active.',
+        );
+        return null;
+      }
+
+      this.memMapHandle = handle;
+
+      // FILE_MAP_READ = 0x0004
+      const view = this.windowsApi.MapViewOfFile(handle, 0x0004, 0, 0, MEMMAPFILESIZE);
+
+      if (!view || view.isNull()) {
+        console.error('Failed to map view of iRacing shared memory.');
+        this.windowsApi.CloseHandle(handle);
+        this.memMapHandle = null;
+        return null;
+      }
+
+      // Copy the mapped memory into a Node.js Buffer so we can work with it safely
+      const buffer = Buffer.alloc(MEMMAPFILESIZE);
+      view.reinterpret(MEMMAPFILESIZE).copy(buffer);
+
+      // Unmap after copying — we'll re-read on each refresh cycle
+      this.windowsApi.UnmapViewOfFile(view);
+
+      return buffer;
+    } catch (error) {
+      console.error('Error opening Windows shared memory:', error);
+      return null;
+    }
+  }
+
   private getVarHeaders(): VarHeader[] {
     if (!this.varHeaders && this.header && this.sharedMem) {
       this.varHeaders = [];
@@ -556,13 +627,14 @@ export class IRSDK extends EventEmitter {
   }
 
   private async waitValidDataEvent(): Promise<boolean> {
-    if (this.dataValidEvent && this.windowsApi) {
+    if (this.dataValidEvent && !this.dataValidEvent.isNull() && this.windowsApi?.WaitForSingleObject) {
       const result = this.windowsApi.WaitForSingleObject(
         this.dataValidEvent,
         32,
       );
       return result === 0;
     }
+    // No event handle available — allow proceeding so shared memory can be read directly
     return true;
   }
 
