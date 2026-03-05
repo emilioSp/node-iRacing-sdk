@@ -16,7 +16,7 @@
  *                         current track location (s); diff = live gap
  */
 
-import { IRSDK } from '../src/index.ts';
+import { IRSDK, VARS } from '../src/index.ts';
 
 const formatTime = (s: number): string => {
   if (s <= 0) return '  --:--.---';
@@ -68,8 +68,8 @@ async function main() {
   let lastSessionInfoUpdate = -1;
 
   const refreshIRatingMap = () => {
-    const update: number = ir.get('SessionTick') ?? 0; // use as dirty-check proxy
-    const driverInfo = ir.get('DriverInfo');
+    const update: number = ir.get(VARS.SESSION_TICK) ?? 0; // use as dirty-check proxy
+    const driverInfo = ir.getSessionInfo('DriverInfo');
     if (!driverInfo?.Drivers) return;
     if (update === lastSessionInfoUpdate && iRatingMap.size > 0) return;
     lastSessionInfoUpdate = update;

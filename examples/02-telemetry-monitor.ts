@@ -4,7 +4,7 @@
  * Display live telemetry data in the terminal, updated every 100ms
  */
 
-import { IRSDK } from '../src/index.ts';
+import { IRSDK, VARS } from '../src/index.ts';
 
 async function main() {
   const ir = new IRSDK();
@@ -29,17 +29,14 @@ async function main() {
     // Freeze buffer for consistent reads
     ir.freezeVarBufferLatest();
 
-    const speed = ir.get('Speed') || 0;
-    const rpm = ir.get('EngineRPM') || 0;
-    const throttle = ir.get('Throttle') || 0;
-    const brake = ir.get('Brake') || 0;
-    const clutch = ir.get('Clutch') || 0;
-    const gear = ir.get('Gear') || 0;
-    const fuel = ir.get('FuelLevel') || 0;
-    const fuelPerLap = ir.get('FuelUsePerHour') || 0;
-    const waterTemp = ir.get('WaterTemp') || 0;
-    const oilTemp = ir.get('OilTemp') || 0;
-    const lapCount = ir.get('LapCount') || 0;
+    const speed = ir.get(VARS.SPEED) || 0;
+    const rpm = ir.get(VARS.RPM) || 0;
+    const throttle = ir.get(VARS.THROTTLE) || 0;
+    const brake = ir.get(VARS.BRAKE) || 0;
+    const gear = ir.get(VARS.GEAR) || 0;
+    const fuel = ir.get(VARS.FUEL_LEVEL) || 0;
+    const fuelPerLap = ir.get(VARS.FUEL_USE_PER_HOUR) || 0;
+    const lapCount = ir.get(VARS.LAP) || 0;
     const lapDistance = ir.get('LapDist') || 0;
 
     // Clear screen and display
@@ -61,21 +58,12 @@ async function main() {
     console.log(
       `║ Brake:        ${String(`${(brake * 100).toFixed(1)}%`).padEnd(32)} ║`,
     );
-    console.log(
-      `║ Clutch:       ${String(`${(clutch * 100).toFixed(1)}%`).padEnd(32)} ║`,
-    );
     console.log('╠═══════════════════════════════════════════════════╣');
     console.log(
       `║ Fuel:         ${String(`${fuel.toFixed(2)} L`).padEnd(32)} ║`,
     );
     console.log(
       `║ Fuel/Lap:     ${String(`${(fuelPerLap / 3600).toFixed(2)} L/h`).padEnd(32)} ║`,
-    );
-    console.log(
-      `║ Water Temp:   ${String(`${waterTemp.toFixed(1)} °C`).padEnd(32)} ║`,
-    );
-    console.log(
-      `║ Oil Temp:     ${String(`${oilTemp.toFixed(1)} °C`).padEnd(32)} ║`,
     );
     console.log('╠═══════════════════════════════════════════════════╣');
     console.log(

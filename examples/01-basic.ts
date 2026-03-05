@@ -4,7 +4,8 @@
  * This is the simplest example - connect to iRacing and read some telemetry data
  */
 
-import { IRSDK } from '../src/index.ts';
+import { IRSDK, VARS } from '../src/index.ts';
+import { SESSION_DATA_KEYS } from '../src/vars.ts';
 
 async function main() {
   const ir = new IRSDK();
@@ -28,18 +29,23 @@ async function main() {
 
   // Read some telemetry data
   console.log('=== Current Telemetry ===');
-  console.log(`Speed: ${ir.get('Speed')?.toFixed(2) || 'N/A'} m/s`);
-  console.log(`RPM: ${ir.get('EngineRPM')?.toFixed(0) || 'N/A'}`);
-  console.log(`Gear: ${ir.get('Gear') || 'N/A'}`);
-  console.log(`Throttle: ${((ir.get('Throttle') || 0) * 100).toFixed(1)}%`);
-  console.log(`Brake: ${((ir.get('Brake') || 0) * 100).toFixed(1)}%`);
-  console.log(`Fuel: ${ir.get('FuelLevel')?.toFixed(2) || 'N/A'} L`);
+  console.log(`Speed: ${ir.get(VARS.SPEED)?.toFixed(2) || 'N/A'} m/s`);
+  console.log(`RPM: ${ir.get(VARS.RPM)?.toFixed(0) || 'N/A'}`);
+  console.log(`Gear: ${ir.get(VARS.GEAR) || 'N/A'}`);
+  console.log(`Throttle: ${((ir.get(VARS.THROTTLE) || 0) * 100).toFixed(1)}%`);
+  console.log(`Brake: ${((ir.get(VARS.BRAKE) || 0) * 100).toFixed(1)}%`);
+  console.log(`Fuel: ${ir.get(VARS.FUEL_LEVEL)?.toFixed(2) || 'N/A'} L`);
 
   // Read session data
   console.log('\n=== Session Data ===');
-  const weekendInfo = ir.get('WeekendInfo');
+  const weekendInfo = ir.getSessionInfo(SESSION_DATA_KEYS.WEEKEND_INFO);
   console.log(`Track: ${weekendInfo?.TrackDisplayName || 'N/A'}`);
   console.log(`Series: ${weekendInfo?.SeriesName || 'N/A'}`);
+
+  const driverInfo = ir.getSessionInfo(SESSION_DATA_KEYS.DRIVER_INFO);
+  const driver = driverInfo?.Drivers?.[0];
+  console.log(`Driver: ${driver?.UserName || 'N/A'}`);
+  console.log(`iRating: ${driver?.IRating || 'N/A'}`);
 
   // Clean up
   ir.shutdown();

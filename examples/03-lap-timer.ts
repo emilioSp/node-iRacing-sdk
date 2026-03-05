@@ -4,7 +4,7 @@
  * Track lap times and show best lap, average, and improvement
  */
 
-import { IRSDK } from '../src/index.ts';
+import { IRSDK, VARS } from '../src/index.ts';
 
 interface LapRecord {
   lapNumber: number;
@@ -35,10 +35,9 @@ async function main() {
       process.exit(0);
     }
 
-    const lapCount = ir.get('LapCount') || 0;
-    const lastLapTime = ir.get('LastLapTime') || 0;
-    const _sessionBestLapTime = ir.get('SessionBestLapTime') || 0;
-    const _personalBestLapTime = ir.get('PersonalBestLapTime') || 0;
+    const lapCount = ir.get(VARS.LAP_COMPLETED) || 0;
+    const lastLapTime = ir.get(VARS.LAP_LAST_LAP_TIME) || 0;
+    const _sessionBestLapTime = ir.get(VARS.LAP_BEST_LAP_TIME) || 0;
 
     // Check if we completed a new lap
     if (lapCount > lastLapCount && lastLapTime > 0) {

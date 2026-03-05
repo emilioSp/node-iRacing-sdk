@@ -2,23 +2,23 @@ import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import koffi from 'koffi';
 import {
+  BROADCAST_MSG,
   BROADCASTMSGNAME,
-  BroadcastMsg,
-  CameraState,
-  ChatCommandMode,
+  CAMERA_STATE,
+  CHAT_COMMAND_MODE,
   DATAVALIDEVENTNAME,
-  FFBCommandMode,
+  FFB_COMMAND_MODE,
   MEMMAPFILE,
   MEMMAPFILESIZE,
-  PitCommandMode,
-  ReloadTexturesMode,
-  RpyPosMode,
-  RpySrchMode,
-  RpyStateMode,
-  StatusField,
-  TelemCommandMode,
+  PIT_COMMAND_MODE,
+  RELOAD_TEXTURES_MODE,
+  RPY_POS_MODE,
+  RPY_SRCH_MODE,
+  RPY_STATE_MODE,
+  STATUS_FIELD,
+  TELEM_COMMAND_MODE,
   VAR_TYPE_MAP,
-  VideoCaptureMode,
+  VIDEO_CAPTURE_MODE,
 } from './constants.ts';
 import {
   Header,
@@ -32,6 +32,7 @@ import {
   parseIRSDKYaml,
   translateYamlData,
 } from './utils.ts';
+import type { SessionDataKey, VarKey } from './vars.ts';
 
 type SessionInfoCache = {
   // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
@@ -220,7 +221,7 @@ export class IRSDK extends EventEmitter {
   }
 
   // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
-  get(key: string): any {
+  get(key: VarKey): any {
     if (!this.isInitialized || !this.header) {
       return undefined;
     }
@@ -259,7 +260,47 @@ export class IRSDK extends EventEmitter {
       }
     }
 
-    return this.getSessionInfo(key);
+    throw new Error(`Key ${key} not found in var headers`);
+  }
+
+  getSessionInfo(key: SessionDataKey): any {
+    if (this.lastSessionInfoUpdate < this.sessionInfoUpdate) {
+      this.lastSessionInfoUpdate = this.sessionInfoUpdate;
+
+      for (const cache of this.sessionInfoDict.values()) {
+        if (cache.data) {
+          cache.dataLast = cache.data;
+        }
+        cache.data = null;
+      }
+    }
+
+    if (!this.sessionInfoDict.has(key)) {
+      this.sessionInfoDict.set(key, { data: null });
+    }
+
+    const cache = this.sessionInfoDict.get(key);
+    if (!cache) {
+      return null;
+    }
+
+    if (cache.data) {
+      return cache.data;
+    }
+
+    if (this.parseYamlAsync) {
+      if (
+        !cache.asyncSessionInfoUpdate ||
+        cache.asyncSessionInfoUpdate < this.lastSessionInfoUpdate
+      ) {
+        cache.asyncSessionInfoUpdate = this.lastSessionInfoUpdate;
+        this.parseYamlAsync && this.parseYamlContent(key, cache);
+      }
+    } else {
+      this.parseYamlContent(key, cache);
+    }
+
+    return cache.data;
   }
 
   get isConnected(): boolean {
@@ -267,13 +308,13 @@ export class IRSDK extends EventEmitter {
       return false;
     }
 
-    if (this.header.status === StatusField.status_connected) {
+    if (this.header.status === STATUS_FIELD.STATUS_CONNECTED) {
       this.workaroundConnectedState = 0;
     }
 
     if (
       this.workaroundConnectedState === 0 &&
-      this.header.status !== StatusField.status_connected
+      this.header.status !== STATUS_FIELD.STATUS_CONNECTED
     ) {
       this.workaroundConnectedState = 1;
     }
@@ -295,7 +336,7 @@ export class IRSDK extends EventEmitter {
     return (
       this.header !== null &&
       (this.testFile !== null || this.dataValidEvent) &&
-      (this.header.status === StatusField.status_connected ||
+      (this.header.status === STATUS_FIELD.STATUS_CONNECTED ||
         this.workaroundConnectedState === 3)
     );
   }
@@ -341,7 +382,7 @@ export class IRSDK extends EventEmitter {
     camera: number = 0,
   ): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.cam_switch_pos,
+      BROADCAST_MSG.CAM_SWITCH_POS,
       position,
       group,
       camera,
@@ -354,92 +395,92 @@ export class IRSDK extends EventEmitter {
     camera: number = 0,
   ): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.cam_switch_num,
+      BROADCAST_MSG.CAM_SWITCH_NUM,
       padCarNumber(carNumber),
       group,
       camera,
     );
   }
 
-  camSetState(cameraState: number = CameraState.cam_tool_active): boolean {
-    return this.broadcastMsg(BroadcastMsg.cam_set_state, cameraState);
+  camSetState(cameraState: number = CAMERA_STATE.CAM_TOOL_ACTIVE): boolean {
+    return this.broadcastMsg(BROADCAST_MSG.CAM_SET_STATE, cameraState);
   }
 
   replaySetPlaySpeed(speed: number = 0, slowMotion: boolean = false): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.replay_set_play_speed,
+      BROADCAST_MSG.REPLAY_SET_PLAY_SPEED,
       speed,
       slowMotion ? 1 : 0,
     );
   }
 
   replaySetPlayPosition(
-    posMode: number = RpyPosMode.begin,
+    posMode: number = RPY_POS_MODE.BEGIN,
     frameNum: number = 0,
   ): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.replay_set_play_position,
+      BROADCAST_MSG.REPLAY_SET_PLAY_POSITION,
       posMode,
       frameNum,
     );
   }
 
-  replaySearch(searchMode: number = RpySrchMode.to_start): boolean {
-    return this.broadcastMsg(BroadcastMsg.replay_search, searchMode);
+  replaySearch(searchMode: number = RPY_SRCH_MODE.TO_START): boolean {
+    return this.broadcastMsg(BROADCAST_MSG.REPLAY_SEARCH, searchMode);
   }
 
-  replaySetState(stateMode: number = RpyStateMode.erase_tape): boolean {
-    return this.broadcastMsg(BroadcastMsg.replay_set_state, stateMode);
+  replaySetState(stateMode: number = RPY_STATE_MODE.ERASE_TAPE): boolean {
+    return this.broadcastMsg(BROADCAST_MSG.REPLAY_SET_STATE, stateMode);
   }
 
   reloadAllTextures(): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.reload_textures,
-      ReloadTexturesMode.all,
+      BROADCAST_MSG.RELOAD_TEXTURES,
+      RELOAD_TEXTURES_MODE.ALL,
     );
   }
 
   reloadTexture(carIdx: number = 0): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.reload_textures,
-      ReloadTexturesMode.car_idx,
+      BROADCAST_MSG.RELOAD_TEXTURES,
+      RELOAD_TEXTURES_MODE.CAR_IDX,
       carIdx,
     );
   }
 
-  chatCommand(chatCommandMode: number = ChatCommandMode.begin_chat): boolean {
-    return this.broadcastMsg(BroadcastMsg.chat_command, chatCommandMode);
+  chatCommand(chatCommandMode: number = CHAT_COMMAND_MODE.BEGIN_CHAT): boolean {
+    return this.broadcastMsg(BROADCAST_MSG.CHAT_COMMAND, chatCommandMode);
   }
 
   chatCommandMacro(macroNum: number = 0): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.chat_command,
-      ChatCommandMode.macro,
+      BROADCAST_MSG.CHAT_COMMAND,
+      CHAT_COMMAND_MODE.MACRO,
       macroNum,
     );
   }
 
   pitCommand(
-    pitCommandMode: number = PitCommandMode.clear,
+    pitCommandMode: number = PIT_COMMAND_MODE.CLEAR,
     variable: number = 0,
   ): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.pit_command,
+      BROADCAST_MSG.PIT_COMMAND,
       pitCommandMode,
       variable,
     );
   }
 
-  telemCommand(telemCommandMode: number = TelemCommandMode.stop): boolean {
-    return this.broadcastMsg(BroadcastMsg.telem_command, telemCommandMode);
+  telemCommand(telemCommandMode: number = TELEM_COMMAND_MODE.STOP): boolean {
+    return this.broadcastMsg(BROADCAST_MSG.TELEM_COMMAND, telemCommandMode);
   }
 
   ffbCommand(
-    ffbCommandMode: number = FFBCommandMode.ffb_command_max_force,
+    ffbCommandMode: number = FFB_COMMAND_MODE.FFB_COMMAND_MAX_FORCE,
     value: number = 0,
   ): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.ffb_command,
+      BROADCAST_MSG.FFB_COMMAND,
       ffbCommandMode,
       Math.floor(value * 65536),
     );
@@ -450,16 +491,16 @@ export class IRSDK extends EventEmitter {
     sessionTimeMs: number = 0,
   ): boolean {
     return this.broadcastMsg(
-      BroadcastMsg.replay_search_session_time,
+      BROADCAST_MSG.REPLAY_SEARCH_SESSION_TIME,
       sessionNum,
       sessionTimeMs,
     );
   }
 
   videoCapture(
-    videoCaptureMode: number = VideoCaptureMode.trigger_screen_shot,
+    videoCaptureMode: number = VIDEO_CAPTURE_MODE.TRIGGER_SCREEN_SHOT,
   ): boolean {
-    return this.broadcastMsg(BroadcastMsg.video_capture, videoCaptureMode);
+    return this.broadcastMsg(BROADCAST_MSG.VIDEO_CAPTURE, videoCaptureMode);
   }
 
   // Private methods
@@ -575,47 +616,6 @@ export class IRSDK extends EventEmitter {
       (a, b) => b.tickCount - a.tickCount,
     );
     return sorted.length > 1 ? sorted[1] : sorted[0];
-  }
-
-  // biome-ignore lint/suspicious/noExplicitAny: Session data is dynamically typed
-  private getSessionInfo(key: string): any {
-    if (this.lastSessionInfoUpdate < this.sessionInfoUpdate) {
-      this.lastSessionInfoUpdate = this.sessionInfoUpdate;
-
-      for (const cache of this.sessionInfoDict.values()) {
-        if (cache.data) {
-          cache.dataLast = cache.data;
-        }
-        cache.data = null;
-      }
-    }
-
-    if (!this.sessionInfoDict.has(key)) {
-      this.sessionInfoDict.set(key, { data: null });
-    }
-
-    const cache = this.sessionInfoDict.get(key);
-    if (!cache) {
-      return null;
-    }
-
-    if (cache.data) {
-      return cache.data;
-    }
-
-    if (this.parseYamlAsync) {
-      if (
-        !cache.asyncSessionInfoUpdate ||
-        cache.asyncSessionInfoUpdate < this.lastSessionInfoUpdate
-      ) {
-        cache.asyncSessionInfoUpdate = this.lastSessionInfoUpdate;
-        this.parseYamlAsync && this.parseYamlContent(key, cache);
-      }
-    } else {
-      this.parseYamlContent(key, cache);
-    }
-
-    return cache.data;
   }
 
   private parseYamlContent(key: string, cache: SessionInfoCache): void {
