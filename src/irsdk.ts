@@ -303,7 +303,7 @@ export class IRSDK extends EventEmitter {
     return cache.data;
   }
 
-  get isConnected(): boolean {
+  isConnected(): boolean {
     if (!this.header) {
       return false;
     }

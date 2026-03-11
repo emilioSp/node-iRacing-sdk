@@ -80,7 +80,7 @@ async function main() {
       JSON.stringify(driverInfo.Drivers?.[0], null, 2),
     );
 
-    iRatingMap = new Map();
+    iRatingMap = new Map<number, number>();
     for (const driver of driverInfo.Drivers) {
       const idx = driver.CarIdx;
       const rating = Number(driver.IRating ?? 0);
@@ -101,11 +101,11 @@ async function main() {
     ir.freezeVarBufferLatest();
 
     // ── Raw data from shared memory ──────────────────────────────────────────
-    const playerIdx: number = ir.get('PlayerCarIdx') ?? -1;
-    const positions: number[] = ir.get('CarIdxPosition') ?? [];
-    const lastLaps: number[] = ir.get('CarIdxLastLapTime') ?? [];
-    const estTimes: number[] = ir.get('CarIdxEstTime') ?? [];
-    const sessionTime: number = ir.get('SessionTime') ?? 0;
+    const playerIdx: number = ir.get(VARS.PLAYER_CAR_IDX) ?? -1;
+    const positions: number[] = ir.get(VARS.CAR_IDX_POSITION) ?? [];
+    const lastLaps: number[] = ir.get(VARS.CAR_IDX_LAST_LAP_TIME) ?? [];
+    const estTimes: number[] = ir.get(VARS.CAR_IDX_EST_TIME) ?? [];
+    const sessionTime: number = ir.get(VARS.SESSION_TIME) ?? 0;
 
     ir.unfreezeVarBufferLatest();
 
@@ -119,12 +119,8 @@ async function main() {
     }
 
     // ── Find rank neighbours ─────────────────────────────────────────────────
-    let aheadIdx = -1;
-    let behindIdx = -1;
-    for (let c = 0; c < positions.length; c++) {
-      if (positions[c] === playerPos - 1) aheadIdx = c;
-      if (positions[c] === playerPos + 1) behindIdx = c;
-    }
+    const aheadIdx = positions.findIndex((pos) => pos === playerPos - 1) ?? -1;
+    const behindIdx = positions.findIndex((pos) => pos === playerPos + 1) ?? -1;
 
     // ── iRatings ─────────────────────────────────────────────────────────────
     const playerIR = iRatingMap.get(playerIdx) ?? NaN;
