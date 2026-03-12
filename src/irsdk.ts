@@ -30,7 +30,6 @@ type WindowsApi = {
   OpenFileMappingW: KoffiFunction;
   MapViewOfFile: KoffiFunction;
   UnmapViewOfFile: KoffiFunction;
-  _koffi: typeof koffi;
 };
 
 type SessionInfoCache = {
@@ -95,7 +94,6 @@ export class IRSDK {
       UnmapViewOfFile: kernel32.func(
         'bool UnmapViewOfFile(void* lpBaseAddress)',
       ),
-      _koffi: koffi,
     };
   }
 
@@ -340,15 +338,11 @@ export class IRSDK {
     }
 
     // koffi.decode returns a plain JS Array of uint8 values — exactly what we need
-    const sharedMem = this.windowsApi._koffi.decode(
+    const sharedMem = koffi.decode(
       this.memMapView,
       koffi.types.uint8,
       MEMMAPFILESIZE,
     );
-
-    if (!Array.isArray(sharedMem) || sharedMem.length === 0) {
-      throw new Error('Decoded shared memory is not a valid array.');
-    }
 
     return sharedMem;
   }
@@ -358,15 +352,26 @@ export class IRSDK {
    * Call this before reading telemetry to get up-to-date values.
    */
   private refreshSharedMemory(): void {
-    if (!this.memMapView || !this.sharedMem || !this.windowsApi._koffi) {
+    if (!this.memMapView || !this.sharedMem) {
       return;
     }
 
-    this.sharedMem = this.windowsApi._koffi.decode(
-      this.memMapView,
-      koffi.types.uint8,
-      MEMMAPFILESIZE,
-    );
+    try {
+      const fresh: number[] = koffi.decode(
+        this.memMapView,
+        koffi.types.uint8,
+        MEMMAPFILESIZE,
+      );
+      // Overwrite in-place so all existing references (header, varHeaders, etc.) see the new data
+      for (let i = 0; i < fresh.length; i++) {
+        this.sharedMem[i] = fresh[i];
+      }
+    } catch (error) {
+      console.error(
+        'Error refreshing shared memory data. Data may be stale.',
+        error,
+      );
+    }
   }
 
   private initVarHeaders() {
