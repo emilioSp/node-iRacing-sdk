@@ -27,3 +27,5 @@ console.log('positions', positions);
 console.log('lastLaps', lastLaps);
 console.log('estTimes', estTimes);
 console.log('sessionTime', sessionTime);
+
+console.log(ir.getVarHeadersNamesList());

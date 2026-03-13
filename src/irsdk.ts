@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import koffi from 'koffi';
-import { Header, VarHeader } from './structs.ts';
+import { getVars, type Header, parseHeader, type Vars } from './structs.ts';
 import {
   checkSimStatus,
   extractYamlSection,
@@ -49,13 +49,14 @@ export class IRSDK {
   private lastSessionInfoUpdate: number = 0;
   private parseYamlAsync: boolean = false;
 
-  private sharedMem: number[] | null = null;
+  // @ts-expect-error We initialize this in the static methods, but it confuses TS that it's not set in the constructor
+  private sharedMem: number[];
   // @ts-expect-error
   private header: Header;
 
   // @ts-expect-error
-  private varHeaders: VarHeader[];
-  private varHeadersMap: Map<string, VarHeader> = new Map();
+  private varHeaders: Vars[];
+  private varHeadersMap: Map<string, Vars> = new Map();
   private varHeadersNames: string[] | null = null;
   private sessionInfoDict: Map<string, SessionInfoCache> = new Map();
 
@@ -85,7 +86,7 @@ export class IRSDK {
 
     const buffer = fs.readFileSync(filePath);
     instance.sharedMem = Array.from(new Uint8Array(buffer));
-    instance.header = new Header(instance.sharedMem);
+    instance.header = parseHeader(instance.sharedMem);
     instance.isInitialized = instance.header.version >= 1;
 
     if (instance.isInitialized) {
@@ -133,7 +134,7 @@ export class IRSDK {
     };
 
     instance.sharedMem = instance.openSharedMemory();
-    instance.header = new Header(instance.sharedMem);
+    instance.header = parseHeader(instance.sharedMem);
     instance.isInitialized = instance.header.version >= 1;
 
     if (instance.isInitialized) {
@@ -159,7 +160,7 @@ export class IRSDK {
 
     this.memMapHandle = null;
     this.memMapView = null;
-    this.sharedMem = null;
+    this.sharedMem = [0];
     this.varHeadersMap.clear();
     this.varHeadersNames = null;
     this.sessionInfoDict.clear();
@@ -174,7 +175,6 @@ export class IRSDK {
 
     const varBuffer = this.header.getVarBuffer();
 
-    const memory = varBuffer.getMemory();
     const offset = varBuffer.bufOffset + varHeader.offset;
     const typeChar = VAR_TYPE_MAP[varHeader.type];
 
@@ -182,7 +182,7 @@ export class IRSDK {
     for (let i = 0; i < varHeader.count; i++) {
       result.push(
         this.unpackValue(
-          memory,
+          this.sharedMem,
           offset + i * this.getTypeSize(typeChar),
           typeChar,
         ),
@@ -277,7 +277,7 @@ export class IRSDK {
     console.log(`  Tick Rate: ${this.header.tickRate}`);
     console.log(`  Num Vars: ${this.header.numVars}`);
     console.log(`  Session Info Len: ${this.header.sessionInfoLen}`);
-    console.log(`  Num Buffers: ${this.header.getNumBuf}`);
+    console.log(`  Num Buffers: ${this.header.numBuf}`);
     console.log(`  Buffer Len: ${this.header.bufLen}`);
 
     const outputDir = path.dirname(outputPath);
@@ -365,19 +365,13 @@ export class IRSDK {
       this.varHeadersMap.clear();
 
       for (let i = 0; i < this.header.numVars; i++) {
-        const varHeader = new VarHeader(
+        const varHeader = getVars(
           this.sharedMem,
           this.header.varHeaderOffset + i * 144,
         );
         this.varHeaders.push(varHeader);
-        if (varHeader.count !== 1)
-          console.log(
-            'varHeader',
-            varHeader.name,
-            varHeader.type,
-            varHeader.count,
-          );
         this.varHeadersMap.set(varHeader.name, varHeader);
+        console.log('name', varHeader.name);
       }
     }
   }

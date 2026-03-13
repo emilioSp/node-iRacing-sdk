@@ -4,37 +4,19 @@
  * so the codebase works with plain JavaScript arrays from koffi.decode().
  */
 
+// Low-level readers from a plain number[] (e.g. from koffi.decode())
+
 function readUInt8(data: number[], offset: number): number {
   return data[offset] & 0xff;
 }
 
 function readInt32LE(data: number[], offset: number): number {
-  const val =
+  return (
     data[offset] |
     (data[offset + 1] << 8) |
     (data[offset + 2] << 16) |
-    (data[offset + 3] << 24);
-  return val; // already signed due to << 24
-}
-
-function readUInt32LE(data: number[], offset: number): number {
-  return (
-    (data[offset] +
-      data[offset + 1] * 0x100 +
-      data[offset + 2] * 0x10000 +
-      data[offset + 3] * 0x1000000) >>>
-    0
+    (data[offset + 3] << 24)
   );
-}
-
-function readFloatLE(data: number[], offset: number): number {
-  const bytes = new Uint8Array([
-    data[offset],
-    data[offset + 1],
-    data[offset + 2],
-    data[offset + 3],
-  ]);
-  return new DataView(bytes.buffer).getFloat32(0, true);
 }
 
 function readDoubleLE(data: number[], offset: number): number {
@@ -51,172 +33,112 @@ function readDoubleLE(data: number[], offset: number): number {
   return new DataView(bytes.buffer).getFloat64(0, true);
 }
 
-export class IRSDKStruct {
-  protected _sharedMem: number[];
-  protected _offset: number;
-
-  constructor(sharedMem: number[], offset: number = 0) {
-    this._sharedMem = sharedMem;
-    this._offset = offset;
+function readString(data: number[], offset: number, maxLength: number): string {
+  const chars: number[] = [];
+  for (let i = 0; i < maxLength; i++) {
+    const byte = data[offset + i];
+    if (byte === 0) break;
+    chars.push(byte);
   }
-
-  protected getValue(offset: number, type: string): number | boolean {
-    const absoluteOffset = this._offset + offset;
-
-    switch (type) {
-      case 'i': // int32
-        return readInt32LE(this._sharedMem, absoluteOffset);
-      case 'I': // uint32
-        return readUInt32LE(this._sharedMem, absoluteOffset);
-      case 'f': // float
-        return readFloatLE(this._sharedMem, absoluteOffset);
-      case 'd': // double
-        return readDoubleLE(this._sharedMem, absoluteOffset);
-      case '?': // bool
-        return readUInt8(this._sharedMem, absoluteOffset) !== 0;
-      case 'c': // char
-        return readUInt8(this._sharedMem, absoluteOffset);
-      default:
-        throw new Error(`Unknown type: ${type}`);
-    }
-  }
-
-  protected getStringValue(offset: number, maxLength: number): string {
-    const absoluteOffset = this._offset + offset;
-    const chars: number[] = [];
-    for (let i = 0; i < maxLength; i++) {
-      const byte = this._sharedMem[absoluteOffset + i];
-      if (byte === 0) break;
-      chars.push(byte);
-    }
-    // Decode as latin1 (each byte maps directly to its char code)
-    return String.fromCharCode(...chars);
-  }
+  return String.fromCharCode(...chars);
 }
 
-export class Header extends IRSDKStruct {
-  get version(): number {
-    return this.getValue(0, 'i') as number;
-  }
+// Plain types
 
-  get status(): number {
-    return this.getValue(4, 'i') as number;
-  }
+export type VarBuffer = {
+  tickCount: number;
+  bufOffset: number;
+};
 
-  get tickRate(): number {
-    return this.getValue(8, 'i') as number;
-  }
+export type Header = {
+  version: number;
+  status: number;
+  tickRate: number;
+  sessionInfoUpdate: number;
+  sessionInfoLen: number;
+  sessionInfoOffset: number;
+  numVars: number;
+  varHeaderOffset: number;
+  bufLen: number;
+  numBuf: number;
+  getVarBuffer(): VarBuffer;
+};
 
-  get sessionInfoUpdate(): number {
-    return this.getValue(12, 'i') as number;
-  }
+export type Vars = {
+  type: number;
+  offset: number;
+  count: number;
+  countAsTime: boolean;
+  name: string;
+  desc: string;
+  unit: string;
+};
 
-  get sessionInfoLen(): number {
-    return this.getValue(16, 'i') as number;
-  }
+export type DiskSubHeader = {
+  sessionStartDate: number;
+  sessionStartTime: number;
+  sessionEndTime: number;
+  sessionLapCount: number;
+  sessionRecordCount: number;
+};
 
-  get sessionInfoOffset(): number {
-    return this.getValue(20, 'i') as number;
-  }
+export const parseHeader = (data: number[]): Header => {
+  const numBuf = readInt32LE(data, 32);
 
-  get numVars(): number {
-    return this.getValue(24, 'i') as number;
-  }
+  return {
+    version: readInt32LE(data, 0),
+    status: readInt32LE(data, 4),
+    tickRate: readInt32LE(data, 8),
+    sessionInfoUpdate: readInt32LE(data, 12),
+    sessionInfoLen: readInt32LE(data, 16),
+    sessionInfoOffset: readInt32LE(data, 20),
+    numVars: readInt32LE(data, 24),
+    varHeaderOffset: readInt32LE(data, 28),
+    bufLen: readInt32LE(data, 36),
+    numBuf,
+    getVarBuffer: (): VarBuffer => {
+      const buffers: VarBuffer[] = [];
+      for (let i = 0; i < numBuf; i++) {
+        buffers.push(parseVarBuffer(data, 48 + i * 16));
+      }
+      // Return 2nd most recent buffer to avoid partially updated buffers
+      const sorted = buffers.sort((a, b) => b.tickCount - a.tickCount);
+      return sorted.length > 1 ? sorted[1] : sorted[0];
+    },
+  };
+};
 
-  get varHeaderOffset(): number {
-    return this.getValue(28, 'i') as number;
-  }
+export const parseVarBuffer = (data: number[], offset: number): VarBuffer => {
+  return {
+    tickCount: readInt32LE(data, offset),
+    bufOffset: readInt32LE(data, offset + 4),
+  };
+};
 
-  getNumBuf(): number {
-    return this.getValue(32, 'i') as number;
-  }
+// Vars
+export const getVars = (data: number[], offset: number): Vars => {
+  return {
+    type: readInt32LE(data, offset),
+    offset: readInt32LE(data, offset + 4),
+    count: readInt32LE(data, offset + 8),
+    countAsTime: readUInt8(data, offset + 12) !== 0,
+    name: readString(data, offset + 16, 32),
+    desc: readString(data, offset + 48, 64),
+    unit: readString(data, offset + 112, 32),
+  };
+};
 
-  get bufLen(): number {
-    return this.getValue(36, 'i') as number;
-  }
-
-  getVarBuffer(): VarBuffer {
-    const buffers: VarBuffer[] = [];
-    for (let i = 0; i < this.getNumBuf(); i++) {
-      buffers.push(new VarBuffer(this._sharedMem, 48 + i * 16));
-    }
-
-    // Return 2nd most recent var buffer (to avoid partially updated buffers)
-    const sortedBuffers = buffers.sort(
-      (a, b) => b.getTickCount() - a.getTickCount(),
-    );
-    return sortedBuffers.length > 1 ? sortedBuffers[1] : sortedBuffers[0];
-  }
-}
-
-export class VarBuffer extends IRSDKStruct {
-  getTickCount(): number {
-    return this.getValue(0, 'i') as number;
-  }
-
-  get _bufOffset(): number {
-    return this.getValue(4, 'i') as number;
-  }
-
-  get bufOffset(): number {
-    return this._bufOffset;
-  }
-
-  getMemory(): number[] {
-    return this._sharedMem;
-  }
-}
-
-export class VarHeader extends IRSDKStruct {
-  get type(): number {
-    return this.getValue(0, 'i') as number;
-  }
-
-  get offset(): number {
-    return this.getValue(4, 'i') as number;
-  }
-
-  get count(): number {
-    return this.getValue(8, 'i') as number;
-  }
-
-  get countAsTime(): boolean {
-    return this.getValue(12, '?') as boolean;
-  }
-
-  get name(): string {
-    return this.getStringValue(16, 32);
-  }
-
-  get desc(): string {
-    return this.getStringValue(48, 64);
-  }
-
-  get unit(): string {
-    return this.getStringValue(112, 32);
-  }
-}
-
-export class DiskSubHeader extends IRSDKStruct {
-  get sessionStartDate(): number {
-    const lo = this.getValue(0, 'i') as number;
-    const hi = this.getValue(4, 'i') as number;
-    return hi * 0x100000000 + (lo >>> 0);
-  }
-
-  get sessionStartTime(): number {
-    return this.getValue(8, 'd') as number;
-  }
-
-  get sessionEndTime(): number {
-    return this.getValue(16, 'd') as number;
-  }
-
-  get sessionLapCount(): number {
-    return this.getValue(24, 'i') as number;
-  }
-
-  get sessionRecordCount(): number {
-    return this.getValue(28, 'i') as number;
-  }
-}
+export const parseDiskSubHeader = (
+  data: number[],
+  offset: number,
+): DiskSubHeader => {
+  const lo = readInt32LE(data, offset);
+  const hi = readInt32LE(data, offset + 4);
+  return {
+    sessionStartDate: hi * 0x100000000 + (lo >>> 0),
+    sessionStartTime: readDoubleLE(data, offset + 8),
+    sessionEndTime: readDoubleLE(data, offset + 16),
+    sessionLapCount: readInt32LE(data, offset + 24),
+    sessionRecordCount: readInt32LE(data, offset + 28),
+  };
+};

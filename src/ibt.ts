@@ -1,5 +1,12 @@
 import * as fs from 'node:fs';
-import { DiskSubHeader, Header, VarHeader } from './structs.ts';
+import {
+  type DiskSubHeader,
+  getVars,
+  type Header,
+  parseDiskSubHeader,
+  parseHeader,
+  type Vars,
+} from './structs.ts';
 import { VAR_TYPE_MAP } from './vars.ts';
 
 export class IBT {
@@ -7,8 +14,8 @@ export class IBT {
   private fileData: number[] | null = null;
   private header: Header | null = null;
   private diskHeader: DiskSubHeader | null = null;
-  private varHeaders: VarHeader[] | null = null;
-  private varHeadersDict: Map<string, VarHeader> = new Map();
+  private varHeaders: Vars[] | null = null;
+  private varHeadersDict: Map<string, Vars> = new Map();
   private varHeadersNames: string[] | null = null;
 
   get varHeadersNamesList(): string[] | null {
@@ -32,8 +39,8 @@ export class IBT {
     this.fileData = [...buf];
 
     if (this.fileData) {
-      this.header = new Header(this.fileData);
-      this.diskHeader = new DiskSubHeader(this.fileData, 112);
+      this.header = parseHeader(this.fileData);
+      this.diskHeader = parseDiskSubHeader(this.fileData, 112);
     }
   }
 
@@ -73,7 +80,7 @@ export class IBT {
     const typeChar = VAR_TYPE_MAP[varHeader.type];
     const varOffset =
       varHeader.offset +
-      this.header.getVarBuffer()._bufOffset +
+      this.header.getVarBuffer().bufOffset +
       index * this.header.bufLen;
 
     return this.unpackValues(varOffset, typeChar, varHeader.count);
@@ -94,7 +101,7 @@ export class IBT {
     // biome-ignore lint/suspicious/noExplicitAny: Telemetry data is dynamically typed
     const results: any[] = [];
     const bufLen = this.header.bufLen;
-    const varOffset = varHeader.offset + this.header.getVarBuffer()._bufOffset;
+    const varOffset = varHeader.offset + this.header.getVarBuffer().bufOffset;
 
     for (let i = 0; i < this.diskHeader.sessionRecordCount; i++) {
       const value = this.unpackValues(
@@ -110,13 +117,13 @@ export class IBT {
 
   // Private methods
 
-  private getVarHeaders(): VarHeader[] {
+  private getVarHeaders(): Vars[] {
     if (!this.varHeaders && this.header && this.fileData) {
       this.varHeaders = [];
       this.varHeadersDict.clear();
 
       for (let i = 0; i < this.header.numVars; i++) {
-        const varHeader = new VarHeader(
+        const varHeader = getVars(
           this.fileData,
           this.header.varHeaderOffset + i * 144,
         );
