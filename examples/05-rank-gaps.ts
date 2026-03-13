@@ -16,7 +16,8 @@
  *                         current track location (s); diff = live gap
  */
 
-import { IRSDK, VARS } from '../src/index.ts';
+import { IRSDK } from '../src/irsdk.ts';
+import { SESSION_DATA_KEYS, VARS } from '../src/vars.ts';
 
 const formatTime = (s: number): string => {
   if (s <= 0) return '  --:--.---';
@@ -49,16 +50,8 @@ const formatDeltaLap = (deltaLap: number): string => {
 };
 
 async function main() {
-  const ir = new IRSDK();
-
   console.log('Connecting to iRacing...');
-  const connected = await ir.startup();
-
-  if (!connected) {
-    console.error('Failed to connect to iRacing');
-    process.exit(1);
-  }
-
+  const ir = await IRSDK.connect();
   console.log('Connected! Press Ctrl+C to exit\n');
 
   // ── iRating lookup: CarIdx → IRating ────────────────────────────────────
@@ -69,8 +62,7 @@ async function main() {
 
   const refreshIRatingMap = () => {
     const update: number = ir.get(VARS.SESSION_TICK) ?? 0; // use as dirty-check proxy
-    const driverInfo = ir.getSessionInfo('DriverInfo');
-    if (!driverInfo?.Drivers) return;
+    const driverInfo = ir.getSessionInfo(SESSION_DATA_KEYS.DRIVER_INFO);
     if (update === lastSessionInfoUpdate && iRatingMap.size > 0) return;
     lastSessionInfoUpdate = update;
 

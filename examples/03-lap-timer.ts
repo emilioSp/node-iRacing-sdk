@@ -4,7 +4,8 @@
  * Track lap times and show best lap, average, and improvement
  */
 
-import { IRSDK, VARS } from '../src/index.ts';
+import { IRSDK } from '../src/irsdk.ts';
+import { VARS } from '../src/vars.ts';
 
 interface LapRecord {
   lapNumber: number;
@@ -13,16 +14,8 @@ interface LapRecord {
 }
 
 async function main() {
-  const ir = new IRSDK();
-
   console.log('Connecting to iRacing...');
-  const connected = await ir.startup();
-
-  if (!connected) {
-    console.error('Failed to connect to iRacing');
-    process.exit(1);
-  }
-
+  const ir = await IRSDK.connect();
   console.log('Connected! Waiting for laps...\n');
 
   const laps: LapRecord[] = [];

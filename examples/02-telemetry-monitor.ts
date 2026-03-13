@@ -4,19 +4,12 @@
  * Display live telemetry data in the terminal, updated every 100ms
  */
 
-import { IRSDK, VARS } from '../src/index.ts';
+import { IRSDK } from '../src/irsdk.ts';
+import { VARS } from '../src/vars.ts';
 
 async function main() {
-  const ir = new IRSDK();
-
   console.log('Connecting to iRacing...');
-  const connected = await ir.startup();
-
-  if (!connected) {
-    console.error('Failed to connect to iRacing');
-    process.exit(1);
-  }
-
+  const ir = await IRSDK.connect();
   console.log('Connected! Press Ctrl+C to exit\n');
 
   const updateInterval = setInterval(() => {
@@ -37,7 +30,7 @@ async function main() {
     const fuel = ir.get(VARS.FUEL_LEVEL) || 0;
     const fuelPerLap = ir.get(VARS.FUEL_USE_PER_HOUR) || 0;
     const lapCount = ir.get(VARS.LAP) || 0;
-    const lapDistance = ir.get('LapDist') || 0;
+    const lapDistance = ir.get(VARS.LAP_DIST) || 0;
 
     // Clear screen and display
     console.clear();

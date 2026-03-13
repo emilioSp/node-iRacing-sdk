@@ -1,3 +1,5 @@
+import type { DriverInfo, SessionInfo, WeekendInfo } from './types.ts';
+
 export const VARS = {
   /** Density of air at start/finish line, kg/m^3 */
   AIR_DENSITY: 'AirDensity',
@@ -659,7 +661,7 @@ export type VarKey = (typeof VARS)[keyof typeof VARS];
 
 export const SESSION_DATA_KEYS = {
   WEEKEND_INFO: 'WeekendInfo',
-  SESSION_INFO: 'SessionList',
+  SESSION_INFO: 'SessionInfo',
   CAMERA_INFO: 'CameraInfo',
   RADIO_INFO: 'RadioInfo',
   DRIVER_INFO: 'DriverInfo',
@@ -667,5 +669,13 @@ export const SESSION_DATA_KEYS = {
   CAR_SETUP_INFO: 'CarSetupInfo',
 } as const;
 
+export const VAR_TYPE_MAP = ['c', '?', 'i', 'I', 'f', 'd'];
+
 export type SessionDataKey =
   (typeof SESSION_DATA_KEYS)[keyof typeof SESSION_DATA_KEYS];
+
+export type SessionDataValue = {
+  DriverInfo: DriverInfo;
+  SessionInfo: SessionInfo;
+  WeekendInfo: WeekendInfo;
+};
